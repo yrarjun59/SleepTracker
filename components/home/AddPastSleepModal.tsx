@@ -1,3 +1,4 @@
+// components/home/AddPastSleepModal.tsx
 import { useState } from "react";
 import {
   Modal,
@@ -5,12 +6,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Platform,
   Alert,
-  TextInput,
   ScrollView,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { Colors } from "@/constants/Colors";
 import { calculateDuration } from "@/utils/calculations";
 import * as sleepStorage from "@/services/sleepStorage";
@@ -24,34 +22,36 @@ interface Props {
 export function AddPastSleepModal({ visible, onClose, onSaved }: Props) {
   const now = new Date();
 
-  // We keep real Date objects
-  const [sleepDate, setSleepDate] = useState(now);
-  const [wakeDate, setWakeDate] = useState(now);
+  // We store hours & minutes separately for easier control
+  const [sleepDayOffset, setSleepDayOffset] = useState(0); // 0 = today, -1 = yesterday, etc.
+  const [wakeDayOffset, setWakeDayOffset] = useState(0);
 
-  // For native pickers
-  const [picker, setPicker] = useState<{
-    target: "sleep" | "wake";
-    mode: "date" | "time";
-  } | null>(null);
+  const [sleepHour, setSleepHour] = useState(23);
+  const [sleepMinute, setSleepMinute] = useState(0);
+  const [wakeHour, setWakeHour] = useState(7);
+  const [wakeMinute, setWakeMinute] = useState(0);
 
-  // ===== Helpers =====
-  const formatDate = (date: Date) =>
-    date.toLocaleDateString("en-US", {
-      weekday: "short",
+  const createDate = (dayOffset: number, hour: number, minute: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + dayOffset);
+    d.setHours(hour, minute, 0, 0);
+    return d;
+  };
+
+  const sleepDate = createDate(sleepDayOffset, sleepHour, sleepMinute);
+  const wakeDate = createDate(wakeDayOffset, wakeHour, wakeMinute);
+
+  const formatPreview = (date: Date) =>
+    date.toLocaleString("en-US", {
       month: "short",
       day: "numeric",
-    });
-
-  const formatTime = (date: Date) =>
-    date.toLocaleTimeString("en-US", {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
     });
 
-  // ===== Save =====
   const handleSave = async () => {
-    if (wakeDate.getTime() <= sleepDate.getTime()) {
+    if (wakeDate <= sleepDate) {
       Alert.alert("Invalid time", "Wake time must be after sleep time.");
       return;
     }
@@ -83,17 +83,76 @@ export function AddPastSleepModal({ visible, onClose, onSaved }: Props) {
     }
   };
 
-  // ===== Change helpers =====
-  const onPickerChange = (_: any, selected?: Date) => {
-    if (selected && picker) {
-      if (picker.target === "sleep") {
-        setSleepDate(selected);
-      } else {
-        setWakeDate(selected);
-      }
-    }
-    setPicker(null);
-  };
+  const DaySelector = ({
+    value,
+    onChange,
+  }: {
+    value: number;
+    onChange: (v: number) => void;
+  }) => (
+    <View style={styles.selectorRow}>
+      {[0, -1, -2].map((offset) => {
+        const label =
+          offset === 0 ? "Today" : offset === -1 ? "Yesterday" : "2 days ago";
+        const active = value === offset;
+        return (
+          <TouchableOpacity
+            key={offset}
+            style={[styles.chip, active && styles.chipActive]}
+            onPress={() => onChange(offset)}
+          >
+            <Text style={[styles.chipText, active && styles.chipTextActive]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  const TimeSelector = ({
+    hour,
+    minute,
+    onHourChange,
+    onMinuteChange,
+  }: {
+    hour: number;
+    minute: number;
+    onHourChange: (h: number) => void;
+    onMinuteChange: (m: number) => void;
+  }) => (
+    <View style={styles.timeRow}>
+      <View style={styles.timeBlock}>
+        <Text style={styles.timeLabel}>Hour</Text>
+        <View style={styles.stepper}>
+          <TouchableOpacity onPress={() => onHourChange(hour === 0 ? 23 : hour - 1)}>
+            <Text style={styles.stepperBtn}>−</Text>
+          </TouchableOpacity>
+          <Text style={styles.timeValue}>{hour.toString().padStart(2, "0")}</Text>
+          <TouchableOpacity onPress={() => onHourChange(hour === 23 ? 0 : hour + 1)}>
+            <Text style={styles.stepperBtn}>+</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.timeBlock}>
+        <Text style={styles.timeLabel}>Minute</Text>
+        <View style={styles.stepper}>
+          <TouchableOpacity
+            onPress={() => onMinuteChange(minute === 0 ? 45 : minute - 15)}
+          >
+            <Text style={styles.stepperBtn}>−</Text>
+          </TouchableOpacity>
+          <Text style={styles.timeValue}>{minute.toString().padStart(2, "0")}</Text>
+          <TouchableOpacity
+            onPress={() => onMinuteChange(minute === 45 ? 0 : minute + 15)}
+          >
+            <Text style={styles.stepperBtn}>+</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -101,61 +160,38 @@ export function AddPastSleepModal({ visible, onClose, onSaved }: Props) {
         <View style={styles.sheet}>
           <ScrollView showsVerticalScrollIndicator={false}>
             <Text style={styles.title}>Add Past Sleep</Text>
-            <Text style={styles.subtitle}>Times use your local timezone</Text>
+            <Text style={styles.subtitle}>All times are in your local timezone</Text>
 
-            {/* ====== SLEEP ====== */}
-            <Text style={styles.sectionTitle}>Sleep time</Text>
-            <View style={styles.row}>
-              <TouchableOpacity
-                style={styles.box}
-                onPress={() => setPicker({ target: "sleep", mode: "date" })}
-              >
-                <Text style={styles.boxLabel}>Date</Text>
-                <Text style={styles.boxValue}>{formatDate(sleepDate)}</Text>
-              </TouchableOpacity>
+            {/* Sleep */}
+            <Text style={styles.section}>When did you go to sleep?</Text>
+            <DaySelector value={sleepDayOffset} onChange={setSleepDayOffset} />
+            <TimeSelector
+              hour={sleepHour}
+              minute={sleepMinute}
+              onHourChange={setSleepHour}
+              onMinuteChange={setSleepMinute}
+            />
 
-              <TouchableOpacity
-                style={styles.box}
-                onPress={() => setPicker({ target: "sleep", mode: "time" })}
-              >
-                <Text style={styles.boxLabel}>Time</Text>
-                <Text style={styles.boxValue}>{formatTime(sleepDate)}</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* ====== WAKE ====== */}
-            <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Wake time</Text>
-            <View style={styles.row}>
-              <TouchableOpacity
-                style={styles.box}
-                onPress={() => setPicker({ target: "wake", mode: "date" })}
-              >
-                <Text style={styles.boxLabel}>Date</Text>
-                <Text style={styles.boxValue}>{formatDate(wakeDate)}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.box}
-                onPress={() => setPicker({ target: "wake", mode: "time" })}
-              >
-                <Text style={styles.boxLabel}>Time</Text>
-                <Text style={styles.boxValue}>{formatTime(wakeDate)}</Text>
-              </TouchableOpacity>
-            </View>
+            {/* Wake */}
+            <Text style={[styles.section, { marginTop: 28 }]}>
+              When did you wake up?
+            </Text>
+            <DaySelector value={wakeDayOffset} onChange={setWakeDayOffset} />
+            <TimeSelector
+              hour={wakeHour}
+              minute={wakeMinute}
+              onHourChange={setWakeHour}
+              onMinuteChange={setWakeMinute}
+            />
 
             {/* Preview */}
             <View style={styles.preview}>
               <Text style={styles.previewLabel}>Preview</Text>
-              <Text style={styles.previewText}>
-                {formatDate(sleepDate)}  {formatTime(sleepDate)}
-              </Text>
+              <Text style={styles.previewText}>{formatPreview(sleepDate)}</Text>
               <Text style={styles.arrow}>↓</Text>
-              <Text style={styles.previewText}>
-                {formatDate(wakeDate)}  {formatTime(wakeDate)}
-              </Text>
+              <Text style={styles.previewText}>{formatPreview(wakeDate)}</Text>
             </View>
 
-            {/* Actions */}
             <View style={styles.actions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
                 <Text style={styles.cancelText}>Cancel</Text>
@@ -165,16 +201,6 @@ export function AddPastSleepModal({ visible, onClose, onSaved }: Props) {
               </TouchableOpacity>
             </View>
           </ScrollView>
-
-          {/* ====== PICKER ====== */}
-          {picker && (
-            <DateTimePicker
-              value={picker.target === "sleep" ? sleepDate : wakeDate}
-              mode={picker.mode}
-              display={Platform.OS === "ios" ? "spinner" : "default"}
-              onChange={onPickerChange}
-            />
-          )}
         </View>
       </View>
     </Modal>
@@ -193,7 +219,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 40,
-    maxHeight: "90%",
+    maxHeight: "92%",
   },
   title: {
     fontSize: 22,
@@ -204,32 +230,65 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.mutedForeground,
     marginTop: 4,
-    marginBottom: 28,
+    marginBottom: 24,
   },
-  sectionTitle: {
+  section: {
     fontSize: 15,
     fontWeight: "600",
     color: Colors.foreground,
     marginBottom: 12,
   },
-  row: {
+  selectorRow: {
     flexDirection: "row",
-    gap: 12,
+    gap: 8,
+    marginBottom: 16,
   },
-  box: {
-    flex: 1,
-    backgroundColor: Colors.muted,
-    borderRadius: 14,
-    paddingVertical: 16,
+  chip: {
+    paddingVertical: 8,
     paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: Colors.muted,
   },
-  boxLabel: {
+  chipActive: {
+    backgroundColor: Colors.primary,
+  },
+  chipText: {
+    fontSize: 13,
+    color: Colors.foreground,
+  },
+  chipTextActive: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  timeRow: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  timeBlock: {
+    flex: 1,
+  },
+  timeLabel: {
     fontSize: 12,
     color: Colors.mutedForeground,
     marginBottom: 6,
   },
-  boxValue: {
-    fontSize: 17,
+  stepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.muted,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  stepperBtn: {
+    fontSize: 22,
+    color: Colors.primary,
+    fontWeight: "600",
+    paddingHorizontal: 8,
+  },
+  timeValue: {
+    fontSize: 18,
     fontWeight: "600",
     color: Colors.foreground,
   },
