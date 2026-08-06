@@ -6,7 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  View
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -21,6 +21,8 @@ import { WeeklyComparisonCard } from "@/components/home/WeeklyComparisonCard";
 
 import { useSleepEntries } from "@/hooks/useSleepEntries";
 import { useWeeklyStats } from "@/hooks/useWeeklyStats";
+import { SleepEntry } from "@/types/sleep";
+
 import {
   formatDuration,
   formatTime,
@@ -46,6 +48,9 @@ export default function HomeScreen() {
   const [elapsedLabel, setElapsedLabel] = useState("0m");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<SleepEntry | undefined>(
+    undefined,
+  );
 
   const isSleeping = !!incomplete;
 
@@ -123,7 +128,18 @@ export default function HomeScreen() {
     );
   }
 
-  // ========== NORMAL MODE ==========
+  const today = new Date().toISOString().split("T")[0];
+  const todayEntries = entries.filter(
+    (e) => e.date === today && e.wakeTime !== null,
+  );
+  const todayTotalDuration = todayEntries.reduce(
+    (sum, e) => sum + (e.duration || 0),
+    0,
+  );
+  const napCount = todayEntries.length;
+
+  const hasEntries = entries.length > 0;
+  // == NORMAL MODE ==
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
@@ -133,9 +149,24 @@ export default function HomeScreen() {
         <HomeHeader date={getDateLabel()} />
 
         <TodaySleepCard
-          sleepTime={entries[0] ? formatTime(entries[0].sleepTime) : null}
-          wakeTime={entries[0] ? formatTime(entries[0].wakeTime) : null}
-          duration={entries[0] ? formatDuration(entries[0].duration) : null}
+          sleepTime={
+            todayEntries.length === 1
+              ? formatTime(todayEntries[0].sleepTime)
+              : null
+          }
+          wakeTime={
+            todayEntries.length === 1
+              ? formatTime(todayEntries[0].wakeTime)
+              : null
+          }
+          duration={
+            todayTotalDuration > 0 ? formatDuration(todayTotalDuration) : null
+          }
+          durationHours={
+            todayTotalDuration > 0 ? todayTotalDuration : undefined
+          }
+          isEmpty={todayEntries.length === 0} // ← only for today
+          napCount={napCount}
         />
 
         <RecordButton title="Record Sleep" onPress={handleRecord} />
@@ -154,14 +185,28 @@ export default function HomeScreen() {
 
       <AddPastSleepModal
         visible={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSaved={refresh}
+        onClose={() => {
+          setShowAddModal(false);
+          setSelectedEntry(undefined);
+        }}
+        onSaved={() => {
+          refresh();
+          setShowAddModal(false);
+          setSelectedEntry(undefined);
+        }}
+        entryToEdit={selectedEntry}
       />
 
       <HistoryModal
         visible={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
         entries={entries}
+        onEdit={(entry) => {
+          setSelectedEntry(entry);
+          setShowHistoryModal(false); // close history modal
+          setShowAddModal(true); // open add/edit modal
+        }}
+        onEntryUpdated={refresh}
       />
     </View>
   );
@@ -182,7 +227,7 @@ const styles = StyleSheet.create({
 
   // ===== Full screen night mode =====
   sleepingScreen: {
-    ...StyleSheet.absoluteFill, // covers everything including tab bar
+    ...StyleSheet.absoluteFill, 
     backgroundColor: "#0B140F",
     zIndex: 999,
     elevation: 999,
