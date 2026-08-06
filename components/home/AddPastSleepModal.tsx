@@ -1,45 +1,53 @@
-// components/home/AddPastSleepModal.tsx
+import { Colors } from "@/constants/Colors";
+import * as sleepStorage from "@/services/sleepStorage";
+import { SleepEntry } from "@/types/sleep";
+import { calculateDuration } from "@/utils/calculations";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
 import { useState } from "react";
 import {
-  Modal,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   Alert,
+  Modal,
+  Platform,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { Colors } from "@/constants/Colors";
-import { calculateDuration } from "@/utils/calculations";
-import * as sleepStorage from "@/services/sleepStorage";
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   onSaved: () => void;
+  entryToEdit?: SleepEntry;
 }
 
-export function AddPastSleepModal({ visible, onClose, onSaved }: Props) {
-  const now = new Date();
-
-  // We store hours & minutes separately for easier control
-  const [sleepDayOffset, setSleepDayOffset] = useState(0); // 0 = today, -1 = yesterday, etc.
-  const [wakeDayOffset, setWakeDayOffset] = useState(0);
-
-  const [sleepHour, setSleepHour] = useState(23);
-  const [sleepMinute, setSleepMinute] = useState(0);
-  const [wakeHour, setWakeHour] = useState(7);
-  const [wakeMinute, setWakeMinute] = useState(0);
-
-  const createDate = (dayOffset: number, hour: number, minute: number) => {
+export function AddPastSleepModal({
+  visible,
+  onClose,
+  onSaved,
+  entryToEdit,
+}: Props) {
+  const [sleepDate, setSleepDate] = useState(() => {
+    if (entryToEdit) return new Date(entryToEdit.sleepTime);
     const d = new Date();
-    d.setDate(d.getDate() + dayOffset);
-    d.setHours(hour, minute, 0, 0);
+    d.setDate(d.getDate() - 1);
+    d.setHours(23, 0, 0, 0);
     return d;
-  };
+  });
 
-  const sleepDate = createDate(sleepDayOffset, sleepHour, sleepMinute);
-  const wakeDate = createDate(wakeDayOffset, wakeHour, wakeMinute);
+  const [wakeDate, setWakeDate] = useState(() => {
+    if (entryToEdit?.wakeTime) return new Date(entryToEdit.wakeTime);
+    const d = new Date();
+    d.setHours(7, 0, 0, 0);
+    return d;
+  });
+
+  const [iosPickerMode, setIosPickerMode] = useState<"sleep" | "wake" | null>(
+    null,
+  );
 
   const formatPreview = (date: Date) =>
     date.toLocaleString("en-US", {
@@ -50,6 +58,36 @@ export function AddPastSleepModal({ visible, onClose, onSaved }: Props) {
       hour12: true,
     });
 
+  // Android picker chain (date → time) with maximumDate
+  const openAndroidPicker = (
+    currentDate: Date,
+    onDateChosen: (date: Date) => void,
+  ) => {
+    DateTimePickerAndroid.open({
+      value: currentDate,
+      mode: "date",
+      is24Hour: false, // shows AM/PM
+      maximumDate: new Date(), // ← block future dates
+      onChange: (event, date) => {
+        if (event.type === "dismissed") return;
+        if (date) {
+          DateTimePickerAndroid.open({
+            value: date,
+            mode: "time",
+            is24Hour: false,
+            maximumDate: new Date(), // ← also block future times
+            onChange: (timeEvent, timeDate) => {
+              if (timeEvent.type === "dismissed") return;
+              if (timeDate) {
+                onDateChosen(timeDate);
+              }
+            },
+          });
+        }
+      },
+    });
+  };
+
   const handleSave = async () => {
     if (wakeDate <= sleepDate) {
       Alert.alert("Invalid time", "Wake time must be after sleep time.");
@@ -58,7 +96,7 @@ export function AddPastSleepModal({ visible, onClose, onSaved }: Props) {
 
     const duration = calculateDuration(
       sleepDate.toISOString(),
-      wakeDate.toISOString()
+      wakeDate.toISOString(),
     );
 
     if (duration < 0.16) {
@@ -66,93 +104,96 @@ export function AddPastSleepModal({ visible, onClose, onSaved }: Props) {
       return;
     }
 
-    try {
-      await sleepStorage.addManualEntry({
-        date: sleepDate.toISOString().split("T")[0],
-        sleepTime: sleepDate.toISOString(),
-        wakeTime: wakeDate.toISOString(),
-        duration,
-        source: "manual",
-      });
+    // Future dates are now blocked by the picker's maximumDate prop – no manual check needed.
 
-      onSaved();
-      onClose();
-      Alert.alert("Saved", "Past sleep entry added.");
+    // Confirmation dialog before saving
+    const sleepStr = sleepDate.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    const wakeStr = wakeDate.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    Alert.alert(
+      "Confirm Sleep Entry",
+      `Sleep: ${sleepStr}\nWake:  ${wakeStr}\nDuration: ${duration.toFixed(1)} hrs`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Save",
+          onPress: () => saveWithDuplicateCheck(),
+        },
+      ],
+    );
+  };
+
+  const saveWithDuplicateCheck = async () => {
+    const newDate = sleepDate.toISOString().split("T")[0];
+
+    try {
+      const allEntries = await sleepStorage.getAllEntries();
+      const duplicate = allEntries.find(
+        (entry) => entry.date === newDate && entry.id !== entryToEdit?.id,
+      );
+
+      if (duplicate) {
+        Alert.alert(
+          "Duplicate Date",
+          `You already have a sleep record for ${newDate}. Would you like to replace it?`,
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Replace",
+              style: "destructive",
+              onPress: async () => {
+                await sleepStorage.deleteEntry(duplicate.id);
+                await saveNewEntry();
+              },
+            },
+          ],
+        );
+        return;
+      }
+
+      await saveNewEntry();
     } catch (e) {
       Alert.alert("Error", "Could not save the entry.");
     }
   };
 
-  const DaySelector = ({
-    value,
-    onChange,
-  }: {
-    value: number;
-    onChange: (v: number) => void;
-  }) => (
-    <View style={styles.selectorRow}>
-      {[0, -1, -2].map((offset) => {
-        const label =
-          offset === 0 ? "Today" : offset === -1 ? "Yesterday" : "2 days ago";
-        const active = value === offset;
-        return (
-          <TouchableOpacity
-            key={offset}
-            style={[styles.chip, active && styles.chipActive]}
-            onPress={() => onChange(offset)}
-          >
-            <Text style={[styles.chipText, active && styles.chipTextActive]}>
-              {label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
+  const saveNewEntry = async () => {
+    const duration = calculateDuration(
+      sleepDate.toISOString(),
+      wakeDate.toISOString(),
+    );
 
-  const TimeSelector = ({
-    hour,
-    minute,
-    onHourChange,
-    onMinuteChange,
-  }: {
-    hour: number;
-    minute: number;
-    onHourChange: (h: number) => void;
-    onMinuteChange: (m: number) => void;
-  }) => (
-    <View style={styles.timeRow}>
-      <View style={styles.timeBlock}>
-        <Text style={styles.timeLabel}>Hour</Text>
-        <View style={styles.stepper}>
-          <TouchableOpacity onPress={() => onHourChange(hour === 0 ? 23 : hour - 1)}>
-            <Text style={styles.stepperBtn}>−</Text>
-          </TouchableOpacity>
-          <Text style={styles.timeValue}>{hour.toString().padStart(2, "0")}</Text>
-          <TouchableOpacity onPress={() => onHourChange(hour === 23 ? 0 : hour + 1)}>
-            <Text style={styles.stepperBtn}>+</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+    const entryData = {
+      ...(entryToEdit ? { id: entryToEdit.id } : {}),
+      date: sleepDate.toISOString().split("T")[0],
+      sleepTime: sleepDate.toISOString(),
+      wakeTime: wakeDate.toISOString(),
+      duration,
+      source: "manual" as const,
+    };
 
-      <View style={styles.timeBlock}>
-        <Text style={styles.timeLabel}>Minute</Text>
-        <View style={styles.stepper}>
-          <TouchableOpacity
-            onPress={() => onMinuteChange(minute === 0 ? 45 : minute - 15)}
-          >
-            <Text style={styles.stepperBtn}>−</Text>
-          </TouchableOpacity>
-          <Text style={styles.timeValue}>{minute.toString().padStart(2, "0")}</Text>
-          <TouchableOpacity
-            onPress={() => onMinuteChange(minute === 45 ? 0 : minute + 15)}
-          >
-            <Text style={styles.stepperBtn}>+</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
+    if (entryToEdit) {
+      await sleepStorage.updateEntry(entryData as SleepEntry);
+    } else {
+      await sleepStorage.addManualEntry(entryData);
+    }
+
+    onSaved();
+    onClose();
+    Alert.alert(entryToEdit ? "Updated" : "Saved", "Sleep entry saved.");
+  };
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -160,29 +201,45 @@ export function AddPastSleepModal({ visible, onClose, onSaved }: Props) {
         <View style={styles.sheet}>
           <ScrollView showsVerticalScrollIndicator={false}>
             <Text style={styles.title}>Add Past Sleep</Text>
-            <Text style={styles.subtitle}>All times are in your local timezone</Text>
+            <Text style={styles.subtitle}>
+              All times are in your local timezone
+            </Text>
 
             {/* Sleep */}
             <Text style={styles.section}>When did you go to sleep?</Text>
-            <DaySelector value={sleepDayOffset} onChange={setSleepDayOffset} />
-            <TimeSelector
-              hour={sleepHour}
-              minute={sleepMinute}
-              onHourChange={setSleepHour}
-              onMinuteChange={setSleepMinute}
-            />
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => {
+                if (Platform.OS === "android") {
+                  openAndroidPicker(sleepDate, setSleepDate);
+                } else {
+                  setIosPickerMode("sleep");
+                }
+              }}
+            >
+              <Text style={styles.dateButtonText}>
+                {formatPreview(sleepDate)}
+              </Text>
+            </TouchableOpacity>
 
             {/* Wake */}
             <Text style={[styles.section, { marginTop: 28 }]}>
               When did you wake up?
             </Text>
-            <DaySelector value={wakeDayOffset} onChange={setWakeDayOffset} />
-            <TimeSelector
-              hour={wakeHour}
-              minute={wakeMinute}
-              onHourChange={setWakeHour}
-              onMinuteChange={setWakeMinute}
-            />
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => {
+                if (Platform.OS === "android") {
+                  openAndroidPicker(wakeDate, setWakeDate);
+                } else {
+                  setIosPickerMode("wake");
+                }
+              }}
+            >
+              <Text style={styles.dateButtonText}>
+                {formatPreview(wakeDate)}
+              </Text>
+            </TouchableOpacity>
 
             {/* Preview */}
             <View style={styles.preview}>
@@ -203,10 +260,27 @@ export function AddPastSleepModal({ visible, onClose, onSaved }: Props) {
           </ScrollView>
         </View>
       </View>
+
+      {/* iOS native picker */}
+      {iosPickerMode && (
+        <DateTimePicker
+          value={iosPickerMode === "sleep" ? sleepDate : wakeDate}
+          mode="datetime"
+          display="spinner"
+          is24Hour={false}
+          maximumDate={new Date()} // ← block future dates
+          onValueChange={(event, date) => {
+            if (date) {
+              if (iosPickerMode === "sleep") setSleepDate(date);
+              else setWakeDate(date);
+            }
+          }}
+          onDismiss={() => setIosPickerMode(null)}
+        />
+      )}
     </Modal>
   );
 }
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -238,58 +312,16 @@ const styles = StyleSheet.create({
     color: Colors.foreground,
     marginBottom: 12,
   },
-  selectorRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 16,
-  },
-  chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    backgroundColor: Colors.muted,
-  },
-  chipActive: {
-    backgroundColor: Colors.primary,
-  },
-  chipText: {
-    fontSize: 13,
-    color: Colors.foreground,
-  },
-  chipTextActive: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  timeRow: {
-    flexDirection: "row",
-    gap: 16,
-  },
-  timeBlock: {
-    flex: 1,
-  },
-  timeLabel: {
-    fontSize: 12,
-    color: Colors.mutedForeground,
-    marginBottom: 6,
-  },
-  stepper: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  dateButton: {
     backgroundColor: Colors.muted,
     borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: "center",
   },
-  stepperBtn: {
-    fontSize: 22,
-    color: Colors.primary,
-    fontWeight: "600",
-    paddingHorizontal: 8,
-  },
-  timeValue: {
-    fontSize: 18,
-    fontWeight: "600",
+  dateButtonText: {
+    fontSize: 16,
+    fontWeight: "500",
     color: Colors.foreground,
   },
   preview: {
