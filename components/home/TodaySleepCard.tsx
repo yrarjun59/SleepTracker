@@ -1,14 +1,16 @@
-import { View, Text, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/Colors";
+import { Ionicons } from "@expo/vector-icons";
+import { StyleSheet, Text, View } from "react-native";
 
 interface TodaySleepCardProps {
   sleepTime: string | null;
   wakeTime: string | null;
-  duration: string | null;
+  duration: string | null; // formatted string (e.g. "7.5 hrs")
+  durationHours?: number; // raw hours for logic (e.g. 0.8)
   isSleeping?: boolean;
   elapsedLabel?: string;
-  isEmpty?: boolean; // new
+  isEmpty?: boolean;
+  napCount?: number; // how many separate sleeps today
 }
 
 const SLEEP_QUOTES = [
@@ -23,18 +25,28 @@ export function TodaySleepCard({
   sleepTime,
   wakeTime,
   duration,
+  durationHours,
   isSleeping = false,
   elapsedLabel,
   isEmpty = false,
+  napCount = 1,
 }: TodaySleepCardProps) {
-  // Pick a stable quote based on the day so it doesn’t change every render
   const quote = SLEEP_QUOTES[new Date().getDate() % SLEEP_QUOTES.length];
+
+  // Decide label for single entries based on duration
+  const isNap =
+    napCount === 1 && durationHours !== undefined && durationHours < 2;
+  const topLabel = isSleeping
+    ? "CURRENTLY SLEEPING"
+    : napCount > 1
+      ? "TODAY'S SLEEP" // multiple chunks – keep generic
+      : isNap
+        ? "TODAY'S NAP"
+        : "TODAY'S SLEEP";
 
   return (
     <View style={styles.card}>
-      <Text style={styles.label}>
-        {isSleeping ? "CURRENTLY SLEEPING" : "TODAY'S SLEEP"}
-      </Text>
+      <Text style={styles.label}>{topLabel}</Text>
 
       {isSleeping ? (
         <View style={styles.sleepingContainer}>
@@ -42,14 +54,26 @@ export function TodaySleepCard({
           <Text style={styles.elapsed}>{elapsedLabel ?? "0m"}</Text>
         </View>
       ) : isEmpty ? (
-        // ===== Empty / First time state =====
         <View style={styles.emptyContainer}>
-          <Ionicons name="moon" size={28} color={Colors.primary} style={{ marginBottom: 12 }} />
+          <Ionicons
+            name="moon"
+            size={28}
+            color={Colors.primary}
+            style={{ marginBottom: 12 }}
+          />
           <Text style={styles.quote}>“{quote}”</Text>
-          <Text style={styles.emptyHint}>Tap the button below to start tracking</Text>
+          <Text style={styles.emptyHint}>
+            Tap the button below to start tracking
+          </Text>
+        </View>
+      ) : napCount > 1 ? (
+        // Multiple naps – show total and count
+        <View style={styles.multiNap}>
+          <Text style={styles.totalDuration}>{duration ?? "—"}</Text>
+          <Text style={styles.napSubtext}>{napCount} naps today</Text>
         </View>
       ) : (
-        // ===== Normal state =====
+        // Single sleep entry
         <View style={styles.row}>
           <View style={styles.times}>
             <View style={styles.timeRow}>
@@ -65,6 +89,7 @@ export function TodaySleepCard({
           <View style={styles.durationContainer}>
             <Text style={styles.duration}>{duration ?? "—"}</Text>
             <Ionicons name="alarm" size={20} color={Colors.primary} />
+            {isNap && <Text style={styles.napBadge}>Nap</Text>}
           </View>
         </View>
       )}
@@ -119,6 +144,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    position: "relative",
   },
   duration: {
     fontSize: 32,
@@ -139,7 +165,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: Colors.primary,
   },
-  // Empty state
   emptyContainer: {
     alignItems: "center",
     paddingVertical: 12,
@@ -155,5 +180,30 @@ const styles = StyleSheet.create({
   emptyHint: {
     fontSize: 13,
     color: Colors.mutedForeground,
+  },
+  // Multiple naps styles
+  multiNap: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  totalDuration: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: Colors.primary,
+    marginBottom: 4,
+  },
+  napSubtext: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  // Single nap badge
+  napBadge: {
+    fontSize: 12,
+    color: Colors.accent,
+    fontWeight: "600",
+    marginTop: 2,
+    position: "absolute",
+    top: "100%",
+    left: 0,
   },
 });
