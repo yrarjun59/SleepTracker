@@ -98,3 +98,12 @@ export async function finishSleep(): Promise<SleepEntry | null> {
   await AsyncStorage.removeItem(INCOMPLETE_KEY);
   return completed;
 }
+
+export async function updateEntry(updatedEntry: SleepEntry): Promise<void> {
+  const entries = await getAllEntries();
+  const index = entries.findIndex(e => e.id === updatedEntry.id);
+  if (index !== -1) {
+    entries[index] = updatedEntry;
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  }
+}
