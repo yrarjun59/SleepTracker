@@ -1,18 +1,21 @@
-import { useMemo } from "react";
 import { SleepEntry } from "@/types/sleep";
-import { getWeeklyAverage, getDifferenceInMinutes } from "@/utils/calculations";
-
+import { getDifferenceInMinutes, getWeeklyAverage } from "@/utils/calculations";
+import { useMemo } from "react";
 
 export function useWeeklyStats(entries: SleepEntry[]) {
   return useMemo(() => {
     const thisWeek = getWeeklyAverage(entries, 0);
     const lastWeek = getWeeklyAverage(entries, -1);
-    const differenceMinutes = getDifferenceInMinutes(thisWeek, lastWeek);
+
+    const differenceMinutes =
+      thisWeek !== null && lastWeek !== null
+        ? getDifferenceInMinutes(thisWeek, lastWeek)
+        : null;
 
     return {
-      thisWeek,
-      lastWeek,
-      differenceMinutes,
+      thisWeek, // number | null
+      lastWeek, // number | null
+      differenceMinutes, // number | null
     };
   }, [entries]);
 }
