@@ -1,7 +1,7 @@
-export function formatTime(iso: string | null): string {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  return date.toLocaleTimeString("en-US", {
+export function formatTime(isoString: string | null): string {
+  if (!isoString) return "—";
+  const date = parseLocalDateTime(isoString);
+  return date.toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
@@ -44,7 +44,7 @@ export function getWeekRange(offset = 0): { start: Date; end: Date } {
 }
 
 export function getElapsedTime(startIso: string): string {
-  const start = new Date(startIso).getTime();
+  const start = parseLocalDateTime(startIso).getTime();
   const now = Date.now();
   const diffMs = now - start;
 
@@ -57,6 +57,22 @@ export function getElapsedTime(startIso: string): string {
 }
 
 export function getElapsedMinutes(startIso: string): number {
-  const start = new Date(startIso).getTime();
+  const start = parseLocalDateTime(startIso).getTime();
   return Math.floor((Date.now() - start) / 60000);
+}
+export function parseLocalDateTime(iso: string): Date {
+  const [datePart, timePart] = iso.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute] = timePart.split(":").map(Number);
+  return new Date(year, month - 1, day, hour, minute, 0, 0);
+}
+
+export function toLocalISOString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
 }

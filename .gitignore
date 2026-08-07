@@ -41,3 +41,5 @@ yarn-error.*
 /android
 
 /todo.txt
+.claude/
+.vscode/

@@ -1,7 +1,7 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SleepEntry } from "@/types/sleep";
 import { calculateDuration } from "@/utils/calculations";
-
+import { parseLocalDateTime, toLocalISOString } from "@/utils/dateHelpers";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const STORAGE_KEY = "@sleep_entries";
 const INCOMPLETE_KEY = "@incomplete_sleep";
@@ -27,7 +27,7 @@ export async function getIncompleteEntry(): Promise<SleepEntry | null> {
 }
 
 export async function startSleep(): Promise<SleepEntry> {
-  const now = new Date().toISOString();
+  const now = toLocalISOString(new Date());
   const entry: SleepEntry = {
     id: Date.now().toString(),
     date: now.split("T")[0],
@@ -38,12 +38,14 @@ export async function startSleep(): Promise<SleepEntry> {
     createdAt: now,
   };
 
+
   await AsyncStorage.setItem(INCOMPLETE_KEY, JSON.stringify(entry));
   return entry;
 }
 
-
-export async function addManualEntry(entry: Omit<SleepEntry, "id" | "createdAt">): Promise<SleepEntry> {
+export async function addManualEntry(
+  entry: Omit<SleepEntry, "id" | "createdAt">,
+): Promise<SleepEntry> {
   const newEntry: SleepEntry = {
     ...entry,
     id: Date.now().toString(),
@@ -74,15 +76,14 @@ export async function finishSleep(): Promise<SleepEntry | null> {
   const incomplete = await getIncompleteEntry();
   if (!incomplete) return null;
 
-  const elapsedMinutes = Math.floor(
-    (Date.now() - new Date(incomplete.sleepTime).getTime()) / 60000
-  );
+  const sleepStart = parseLocalDateTime(incomplete.sleepTime).getTime();
+  const elapsedMinutes = Math.floor((Date.now() - sleepStart) / 60000);
 
   if (elapsedMinutes < 10) {
     throw new Error("MINIMUM_DURATION");
   }
 
-  const wakeTime = new Date().toISOString();
+  const wakeTime = toLocalISOString(new Date());
   const duration = calculateDuration(incomplete.sleepTime, wakeTime);
 
   const completed: SleepEntry = {
@@ -95,13 +96,15 @@ export async function finishSleep(): Promise<SleepEntry | null> {
   all.unshift(completed);
   await saveAll(all);
 
+
+
   await AsyncStorage.removeItem(INCOMPLETE_KEY);
   return completed;
 }
 
 export async function updateEntry(updatedEntry: SleepEntry): Promise<void> {
   const entries = await getAllEntries();
-  const index = entries.findIndex(e => e.id === updatedEntry.id);
+  const index = entries.findIndex((e) => e.id === updatedEntry.id);
   if (index !== -1) {
     entries[index] = updatedEntry;
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(entries));

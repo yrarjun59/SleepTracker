@@ -8,13 +8,13 @@ interface WeeklyComparisonCardProps {
   differenceMinutes: number | null;
 }
 
-// Helper to format minutes into a human-readable string
+
 function formatDifference(minutes: number): string {
   const abs = Math.abs(minutes);
   if (abs >= 60) {
     const hrs = Math.floor(abs / 60);
     const mins = abs % 60;
-    return mins > 0 ? `+${hrs} hr ${mins} min` : `+${hrs} hr`;
+    return mins > 0 ? `${hrs} hr ${mins} min` : `${hrs} hr`;
   }
   return `${abs} min`;
 }
@@ -78,7 +78,6 @@ export function WeeklyComparisonCard({
   );
 }
 
-// Add a neutral badge style
 
 const styles = StyleSheet.create({
   badgeNeutral: {

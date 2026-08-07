@@ -4,19 +4,15 @@ import { StyleSheet, Text, TouchableOpacity } from "react-native";
 interface RecordButtonProps {
   title: string;
   onPress: () => void;
-  isSleeping?: boolean;
 }
 
-export function RecordButton({
-  title,
-  onPress,
-  isSleeping = false,
-}: RecordButtonProps) {
+export function RecordButton({ title, onPress }: RecordButtonProps) {
   return (
     <TouchableOpacity
-      style={[styles.button, isSleeping && styles.buttonSleeping]}
+      style={styles.button}
       onPress={onPress}
-      activeOpacity={0.85}
+      activeOpacity={0.8}
+      accessibilityLabel={title}
     >
       <Text style={styles.text}>{title}</Text>
     </TouchableOpacity>
@@ -26,25 +22,24 @@ export function RecordButton({
 const styles = StyleSheet.create({
   button: {
     backgroundColor: Colors.primary,
-    height: 64,
-    marginHorizontal: 20,
-    borderRadius: 32, // ← fully rounded (pill shape)
+    width: 100, // finger‑friendly diameter
+    height: 100,
+    borderRadius: 50, // fully round
+    alignSelf: "center", // centered horizontally
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  buttonSleeping: {
-    backgroundColor: "#2E7D32",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
   },
   text: {
     color: "#FFFFFF",
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: "600",
-    letterSpacing: 0.3,
+    textAlign: "center",
+    paddingHorizontal: 8,
   },
 });

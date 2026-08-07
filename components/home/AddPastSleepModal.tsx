@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 
+import { toLocalISOString } from "@/utils/dateHelpers";
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -136,37 +137,43 @@ export function AddPastSleepModal({
   };
 
   const saveWithDuplicateCheck = async () => {
-    const newDate = sleepDate.toISOString().split("T")[0];
+    const newDate = sleepDate.toISOString().split("T")[0]; // YYYY-MM-DD
+    const todayStr = new Date().toISOString().split("T")[0];
 
-    try {
-      const allEntries = await sleepStorage.getAllEntries();
-      const duplicate = allEntries.find(
-        (entry) => entry.date === newDate && entry.id !== entryToEdit?.id,
-      );
-
-      if (duplicate) {
-        Alert.alert(
-          "Duplicate Date",
-          `You already have a sleep record for ${newDate}. Would you like to replace it?`,
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Replace",
-              style: "destructive",
-              onPress: async () => {
-                await sleepStorage.deleteEntry(duplicate.id);
-                await saveNewEntry();
-              },
-            },
-          ],
+    // Only block duplicates for past days – today can have multiple naps
+    if (newDate !== todayStr) {
+      try {
+        const allEntries = await sleepStorage.getAllEntries();
+        const duplicate = allEntries.find(
+          (entry) => entry.date === newDate && entry.id !== entryToEdit?.id,
         );
+
+        if (duplicate) {
+          Alert.alert(
+            "Duplicate Date",
+            `You already have a sleep record for that ${newDate}. Would you like to replace it?`,
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Replace",
+                style: "destructive",
+                onPress: async () => {
+                  await sleepStorage.deleteEntry(duplicate.id);
+                  await saveNewEntry();
+                },
+              },
+            ],
+          );
+          return;
+        }
+      } catch (e) {
+        Alert.alert("Error", "Could not check for duplicates.");
         return;
       }
-
-      await saveNewEntry();
-    } catch (e) {
-      Alert.alert("Error", "Could not save the entry.");
     }
+
+    // For today (or if no duplicate found) – just save
+    await saveNewEntry();
   };
 
   const saveNewEntry = async () => {
@@ -177,9 +184,9 @@ export function AddPastSleepModal({
 
     const entryData = {
       ...(entryToEdit ? { id: entryToEdit.id } : {}),
-      date: sleepDate.toISOString().split("T")[0],
-      sleepTime: sleepDate.toISOString(),
-      wakeTime: wakeDate.toISOString(),
+      date: toLocalISOString(sleepDate).split("T")[0],
+      sleepTime: toLocalISOString(sleepDate),
+      wakeTime: toLocalISOString(wakeDate),
       duration,
       source: "manual" as const,
     };

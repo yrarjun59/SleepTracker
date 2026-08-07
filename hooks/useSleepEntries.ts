@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
-import { SleepEntry } from "@/types/sleep";
 import * as sleepStorage from "@/services/sleepStorage";
+import { SleepEntry } from "@/types/sleep";
+import { useCallback, useEffect, useState } from "react";
 
 export function useSleepEntries() {
   const [entries, setEntries] = useState<SleepEntry[]>([]);
@@ -41,7 +41,7 @@ export function useSleepEntries() {
       }
     } catch (error: any) {
       if (error.message === "MINIMUM_DURATION") {
-        throw error; // let the UI handle the warning
+        throw error; 
       }
       console.error(error);
     }

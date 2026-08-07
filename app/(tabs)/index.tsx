@@ -1,18 +1,19 @@
 import { Colors } from "@/constants/Colors";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  BackHandler,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
-  View,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AddPastSleepModal } from "@/components/home/AddPastSleepModal";
 import { HistoryModal } from "@/components/home/HistoryModal";
-import { HoldToCancelButton } from "@/components/home/HoldToCancelButton";
+import { HoldToRecordButton } from "@/components/home/HoldToRecordButton";
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { RecordButton } from "@/components/home/RecordButton";
 import { SecondaryActions } from "@/components/home/SecondaryActions";
@@ -22,6 +23,7 @@ import { WeeklyComparisonCard } from "@/components/home/WeeklyComparisonCard";
 import { useSleepEntries } from "@/hooks/useSleepEntries";
 import { useWeeklyStats } from "@/hooks/useWeeklyStats";
 import { SleepEntry } from "@/types/sleep";
+import { parseLocalDateTime } from "@/utils/dateHelpers";
 
 import {
   formatDuration,
@@ -30,6 +32,9 @@ import {
   getElapsedMinutes,
   getElapsedTime,
 } from "@/utils/dateHelpers";
+
+import * as NavigationBar from "expo-navigation-bar";
+import { useNavigation, usePathname } from "expo-router";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -69,44 +74,61 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [incomplete]);
 
-  // ========== Handlers ==========
-  const handleRecord = async () => {
-    if (!isSleeping) {
-      await startSleep();
-      return;
-    }
+  const navigation = useNavigation();
 
-    const minutes = getElapsedMinutes(incomplete!.sleepTime);
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: { display: isSleeping ? "none" : "flex" },
+    });
+  }, [isSleeping, navigation]);
 
-    if (minutes < 10) {
-      Alert.alert(
-        "Too short",
-        "Sleep must be at least 10 minutes.\n\nHold the button for 5 seconds to cancel this session.",
+  useEffect(() => {
+    if (isSleeping) {
+      // Block Android back button
+      const backHandler = BackHandler.addEventListener(
+        "hardwareBackPress",
+        () => true,
       );
-      return;
-    }
-
-    try {
-      await finishSleep();
-    } catch (error: any) {
-      if (error?.message === "MINIMUM_DURATION") {
-        Alert.alert("Too short", "Sleep must be at least 10 minutes.");
+      // Hide Android navigation bar (optional)
+      if (Platform.OS === "android") {
+        NavigationBar.setVisibilityAsync("hidden");
       }
+
+      return () => {
+        backHandler.remove();
+        if (Platform.OS === "android") {
+          NavigationBar.setVisibilityAsync("visible");
+        }
+      };
+    }
+  }, [isSleeping]);
+
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (pathname === "/") {
+      refresh();
+    }
+  }, [pathname, refresh]);
+
+  // ---------- Handlers ----------
+  const handleRecord = async () => {
+    await startSleep();
+  };
+
+  const handleHoldComplete = async () => {
+    const minutes = getElapsedMinutes(incomplete!.sleepTime);
+    try {
+      if (minutes >= 10) {
+        await finishSleep(); // save the entry
+      } else {
+        await abortSleep(); // discard silently
+      }
+    } catch (error: any) {
+      // fallback – just abort if anything goes wrong
+      await abortSleep();
     }
   };
-
-  const handleAbort = async () => {
-    await abortSleep();
-  };
-
-  // ========== Loading ==========
-  if (loading) {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
-  }
 
   // ========== FULL SCREEN SLEEPING MODE ==========
   if (isSleeping) {
@@ -119,11 +141,17 @@ export default function HomeScreen() {
           </Text>
           <Text style={styles.sleepingTimer}>{elapsedLabel}</Text>
 
-          <HoldToCancelButton
-            onFinishPress={handleRecord}
-            onComplete={handleAbort}
-          />
+          <HoldToRecordButton onComplete={handleHoldComplete} />
         </View>
+      </View>
+    );
+  }
+
+  // ========== Loading ==========
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
@@ -138,8 +166,18 @@ export default function HomeScreen() {
   );
   const napCount = todayEntries.length;
 
-  const hasEntries = entries.length > 0;
-  // == NORMAL MODE ==
+  const lastCompletedEntry =
+    entries
+      .filter((e) => e.wakeTime !== null)
+      .sort(
+        (a, b) =>
+          parseLocalDateTime(b.wakeTime!).getTime() -
+          parseLocalDateTime(a.wakeTime!).getTime(),
+      )[0] || null;
+
+ 
+
+  // ========== NORMAL MODE ==========
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
@@ -165,8 +203,9 @@ export default function HomeScreen() {
           durationHours={
             todayTotalDuration > 0 ? todayTotalDuration : undefined
           }
-          isEmpty={todayEntries.length === 0} // ← only for today
+          isEmpty={todayEntries.length === 0}
           napCount={napCount}
+          lastCompletedEntry={lastCompletedEntry}
         />
 
         <RecordButton title="Record Sleep" onPress={handleRecord} />
@@ -203,8 +242,8 @@ export default function HomeScreen() {
         entries={entries}
         onEdit={(entry) => {
           setSelectedEntry(entry);
-          setShowHistoryModal(false); // close history modal
-          setShowAddModal(true); // open add/edit modal
+          setShowHistoryModal(false);
+          setShowAddModal(true);
         }}
         onEntryUpdated={refresh}
       />
@@ -227,7 +266,7 @@ const styles = StyleSheet.create({
 
   // ===== Full screen night mode =====
   sleepingScreen: {
-    ...StyleSheet.absoluteFill, 
+    ...StyleSheet.absoluteFill,
     backgroundColor: "#0B140F",
     zIndex: 999,
     elevation: 999,
