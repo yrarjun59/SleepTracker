@@ -43,3 +43,5 @@ yarn-error.*
 /todo.txt
 .claude/
 .vscode/
+eas.json
+app.json
