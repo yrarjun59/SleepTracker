@@ -1,10 +1,9 @@
+// components/home/HistoryModal.tsx
 import { Colors } from "@/constants/Colors";
-import * as sleepStorage from "@/services/sleepStorage";
 import { SleepEntry } from "@/types/sleep";
-import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { getMonthlySummary } from "@/utils/analyticsHelpers";
+import { useMemo, useState } from "react";
 import {
-  Alert,
   FlatList,
   Modal,
   StyleSheet,
@@ -19,9 +18,6 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   entries: SleepEntry[];
-  onEdit: (entry: SleepEntry) => void;
-  onEntryUpdated: () => void;
-  showActions?: boolean; // NEW – defaults to true
 }
 
 const TABS: { key: Tab; label: string }[] = [
@@ -31,57 +27,67 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "6m", label: "6 Months" },
 ];
 
-export function HistoryModal({
-  visible,
-  onClose,
-  entries,
-  onEdit,
-  onEntryUpdated,
-  showActions = true, // default
-}: Props) {
+// Quality verdict helper
+function getQualityVerdict(duration: number | null): string {
+  if (duration === null) return "—";
+  if (duration >= 7 && duration <= 9) return "Good";
+  if (duration < 6) return "Low";
+  if (duration > 9) return "Long";
+  return "Fair";
+}
+
+// Helper to get start of a day N days ago
+const daysAgo = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+export function HistoryModal({ visible, onClose, entries }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("7d");
 
-  const now = new Date();
-  const filtered = entries.filter((entry) => {
-    const entryDate = new Date(entry.sleepTime);
-    const diffMs = now.getTime() - entryDate.getTime();
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  // Compute displayed data based on active tab
+  const { individualEntries, monthlySummary } = useMemo(() => {
+    const now = new Date();
+
+    let start: Date;
+    let end: Date;
 
     switch (activeTab) {
       case "7d":
-        return diffDays <= 7;
+        end = now;
+        start = daysAgo(7);
+        break;
       case "15d":
-        return diffDays <= 15;
+        end = daysAgo(7);
+        start = daysAgo(15);
+        break;
       case "30d":
-        return diffDays <= 30;
+        end = daysAgo(15);
+        start = daysAgo(30);
+        break;
       case "6m":
-        return diffDays <= 180;
+        return {
+          individualEntries: [],
+          monthlySummary: getMonthlySummary(entries, 6),
+        };
+      default:
+        return { individualEntries: [], monthlySummary: null };
     }
-  });
 
-  const sorted = [...filtered].sort(
-    (a, b) => new Date(b.sleepTime).getTime() - new Date(a.sleepTime).getTime(),
-  );
+    const filtered = entries.filter((e) => {
+      const d = new Date(e.sleepTime);
+      return d >= start && d <= end;
+    });
 
-  
-
-  const handleDelete = (entry: SleepEntry) => {
-    Alert.alert(
-      "Delete Entry",
-      "Are you sure you want to delete this sleep record?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            await sleepStorage.deleteEntry(entry.id);
-            onEntryUpdated();
-          },
-        },
-      ],
+    const sorted = [...filtered].sort(
+      (a, b) =>
+        new Date(b.sleepTime).getTime() - new Date(a.sleepTime).getTime(),
     );
-  };
+
+    return { individualEntries: sorted, monthlySummary: null };
+  }, [entries, activeTab]);
 
   const formatEntry = (entry: SleepEntry) => {
     const sleep = new Date(entry.sleepTime);
@@ -138,48 +144,63 @@ export function HistoryModal({
             ))}
           </View>
 
-          {sorted.length === 0 ? (
+          {/* 6‑month aggregated view */}
+          {activeTab === "6m" ? (
+            monthlySummary && monthlySummary.length > 0 ? (
+              <FlatList
+                data={monthlySummary}
+                keyExtractor={(item) => item.month}
+                showsVerticalScrollIndicator={false}
+                style={{ flex: 1 }}
+                renderItem={({ item }) => (
+                  <View style={styles.monthRow}>
+                    <Text style={styles.monthLabel}>{item.month}</Text>
+                    <View style={styles.monthStats}>
+                      <Text style={styles.monthTotal}>
+                        {item.totalHours.toFixed(1)} hrs
+                      </Text>
+                      <Text style={styles.monthDetail}>
+                        Avg {item.avgHours.toFixed(1)} · {item.nights} night
+                        {item.nights !== 1 ? "s" : ""}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              />
+            ) : (
+              <Text style={styles.empty}>
+                No sleep data in the last 6 months.
+              </Text>
+            )
+          ) : individualEntries.length === 0 ? (
             <Text style={styles.empty}>No entries in this period.</Text>
           ) : (
             <FlatList
-              data={sorted}
+              data={individualEntries}
               keyExtractor={(item) => item.id}
               showsVerticalScrollIndicator={false}
               style={{ flex: 1 }}
               renderItem={({ item }) => (
                 <View style={styles.item}>
-                  <View style={{ flex: 1 }}>
+                  <View style={styles.leftBlock}>
                     <Text style={styles.itemText}>{formatEntry(item)}</Text>
                     <Text style={styles.duration}>
-                      {item.duration ? `${item.duration.toFixed(1)} hrs` : ""}
+                      {item.duration ? `${item.duration.toFixed(1)} hrs` : "—"}
                     </Text>
                   </View>
-                  {showActions && (
-                    <View style={styles.actions}>
-                      <TouchableOpacity
-                        onPress={() => onEdit(item)}
-                        hitSlop={8}
-                        style={styles.iconBtn}
-                      >
-                        <Ionicons
-                          name="create-outline"
-                          size={18}
-                          color={Colors.primary}
-                        />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => handleDelete(item)}
-                        hitSlop={8}
-                        style={styles.iconBtn}
-                      >
-                        <Ionicons
-                          name="trash-outline"
-                          size={18}
-                          color="#CC3333"
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  )}
+
+                  <View style={styles.rightBlock}>
+                    <Text
+                      style={[
+                        styles.qualityLabel,
+                        item.duration && item.duration >= 7
+                          ? styles.qualityGood
+                          : null,
+                      ]}
+                    >
+                      {getQualityVerdict(item.duration)}
+                    </Text>
+                  </View>
                 </View>
               )}
             />
@@ -255,24 +276,55 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
+  leftBlock: {
+    flex: 1,
+  },
   itemText: {
     fontSize: 15,
     color: Colors.foreground,
     fontWeight: "500",
-    flex: 1,
   },
   duration: {
     fontSize: 13,
     color: Colors.mutedForeground,
     marginTop: 4,
   },
-  actions: {
-    flexDirection: "row",
-    gap: 16,
+  rightBlock: {
+    alignItems: "flex-end",
     marginLeft: 12,
-    alignItems: "center",
   },
-  iconBtn: {
-    padding: 4,
+  qualityLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: Colors.textSecondary,
+  },
+  qualityGood: {
+    color: Colors.success,
+  },
+  monthRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  monthLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.foreground,
+  },
+  monthStats: {
+    alignItems: "flex-end",
+  },
+  monthTotal: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: Colors.accent,
+  },
+  monthDetail: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 });

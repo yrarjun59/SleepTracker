@@ -17,4 +17,5 @@ export const Colors = {
   textSecondary: "#7982A9", // muted periwinkle
   mutedForeground: "#3B4261", // very subdue
   warning: "#FF9F0A", // amber – gentle but noticeable
+  success: "#30D158",
 };

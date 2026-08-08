@@ -7,7 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  View
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -22,7 +22,6 @@ import { WeeklyComparisonCard } from "@/components/home/WeeklyComparisonCard";
 
 import { useSleepEntries } from "@/hooks/useSleepEntries";
 import { useWeeklyStats } from "@/hooks/useWeeklyStats";
-import { SleepEntry } from "@/types/sleep";
 import { parseLocalDateTime } from "@/utils/dateHelpers";
 
 import {
@@ -53,9 +52,6 @@ export default function HomeScreen() {
   const [elapsedLabel, setElapsedLabel] = useState("0m");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [selectedEntry, setSelectedEntry] = useState<SleepEntry | undefined>(
-    undefined,
-  );
 
   const isSleeping = !!incomplete;
 
@@ -78,29 +74,40 @@ export default function HomeScreen() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      tabBarStyle: { display: isSleeping ? "none" : "flex" },
+      tabBarStyle: {
+        // Keep the shared styling from _layout.tsx
+        backgroundColor: Colors.card,
+        borderTopColor: Colors.border,
+        borderTopWidth: 1,
+        height: 60,
+        paddingBottom: 8,
+        paddingTop: 8,
+        // Only toggle visibility
+        display: isSleeping ? "none" : "flex",
+      },
     });
   }, [isSleeping, navigation]);
 
   useEffect(() => {
-    if (isSleeping) {
-      // Block Android back button
-      const backHandler = BackHandler.addEventListener(
-        "hardwareBackPress",
-        () => true,
-      );
-      // Hide Android navigation bar (optional)
-      if (Platform.OS === "android") {
-        NavigationBar.setVisibilityAsync("hidden");
-      }
+    if (!isSleeping) return;
 
-      return () => {
-        backHandler.remove();
-        if (Platform.OS === "android") {
-          NavigationBar.setVisibilityAsync("visible");
-        }
-      };
+    // Block Android back button
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => true,
+    );
+
+    // Hide Android navigation bar
+    if (Platform.OS === "android") {
+      NavigationBar.setVisibilityAsync("hidden").catch(() => {});
     }
+
+    return () => {
+      backHandler.remove();
+      if (Platform.OS === "android") {
+        NavigationBar.setVisibilityAsync("visible").catch(() => {});
+      }
+    };
   }, [isSleeping]);
 
   const pathname = usePathname();
@@ -175,8 +182,6 @@ export default function HomeScreen() {
           parseLocalDateTime(a.wakeTime!).getTime(),
       )[0] || null;
 
- 
-
   // ========== NORMAL MODE ==========
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -224,28 +229,14 @@ export default function HomeScreen() {
 
       <AddPastSleepModal
         visible={showAddModal}
-        onClose={() => {
-          setShowAddModal(false);
-          setSelectedEntry(undefined);
-        }}
-        onSaved={() => {
-          refresh();
-          setShowAddModal(false);
-          setSelectedEntry(undefined);
-        }}
-        entryToEdit={selectedEntry}
+        onClose={() => setShowAddModal(false)}
+        onSaved={refresh}
       />
 
       <HistoryModal
         visible={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
         entries={entries}
-        onEdit={(entry) => {
-          setSelectedEntry(entry);
-          setShowHistoryModal(false);
-          setShowAddModal(true);
-        }}
-        onEntryUpdated={refresh}
       />
     </View>
   );

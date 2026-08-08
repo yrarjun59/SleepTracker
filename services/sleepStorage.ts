@@ -29,7 +29,7 @@ export async function getIncompleteEntry(): Promise<SleepEntry | null> {
 export async function startSleep(): Promise<SleepEntry> {
   const now = toLocalISOString(new Date());
   const entry: SleepEntry = {
-    id: Date.now().toString(),
+    id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
     date: now.split("T")[0],
     sleepTime: now,
     wakeTime: null,
@@ -37,7 +37,6 @@ export async function startSleep(): Promise<SleepEntry> {
     source: "live",
     createdAt: now,
   };
-
 
   await AsyncStorage.setItem(INCOMPLETE_KEY, JSON.stringify(entry));
   return entry;
@@ -48,7 +47,7 @@ export async function addManualEntry(
 ): Promise<SleepEntry> {
   const newEntry: SleepEntry = {
     ...entry,
-    id: Date.now().toString(),
+    id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
     createdAt: new Date().toISOString(),
   };
 
@@ -56,12 +55,6 @@ export async function addManualEntry(
   all.unshift(newEntry);
   await saveAll(all);
   return newEntry;
-}
-
-export async function deleteEntry(id: string): Promise<void> {
-  const all = await getAll();
-  const filtered = all.filter((e) => e.id !== id);
-  await saveAll(filtered);
 }
 
 export async function clearAllData(): Promise<void> {
@@ -96,17 +89,5 @@ export async function finishSleep(): Promise<SleepEntry | null> {
   all.unshift(completed);
   await saveAll(all);
 
-
-
-  await AsyncStorage.removeItem(INCOMPLETE_KEY);
   return completed;
-}
-
-export async function updateEntry(updatedEntry: SleepEntry): Promise<void> {
-  const entries = await getAllEntries();
-  const index = entries.findIndex((e) => e.id === updatedEntry.id);
-  if (index !== -1) {
-    entries[index] = updatedEntry;
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-  }
 }

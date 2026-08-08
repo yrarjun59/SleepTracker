@@ -1,25 +1,27 @@
-import { Tabs } from "expo-router";
+import { Colors } from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "@/constants/Colors"; // we'll create this next
+import { Tabs } from "expo-router";
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: "#999999",
+        // Consistent dark background and fixed height
         tabBarStyle: {
-          backgroundColor: "#FFFFFF",
-          borderTopColor: "#EEEEEE",
-          height: 70,
-          paddingBottom: 10,
+          backgroundColor: Colors.card,
+          borderTopColor: Colors.border,
+          borderTopWidth: 1,
+          height: 60,
+          paddingBottom: 8,
           paddingTop: 8,
         },
+        tabBarActiveTintColor: Colors.accent,
+        tabBarInactiveTintColor: Colors.mutedForeground,
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: "500",
         },
+        headerShown: false,
       }}
     >
       <Tabs.Screen
@@ -27,7 +29,7 @@ export default function TabLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
+            <Ionicons name="moon" size={size} color={color} />
           ),
         }}
       />
@@ -36,7 +38,7 @@ export default function TabLayout() {
         options={{
           title: "Analytics",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="bar-chart-outline" size={size} color={color} />
+            <Ionicons name="stats-chart" size={size} color={color} />
           ),
         }}
       />
@@ -45,7 +47,7 @@ export default function TabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+            <Ionicons name="person-circle-outline" size={size} color={color} />
           ),
         }}
       />
