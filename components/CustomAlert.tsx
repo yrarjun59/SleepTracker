@@ -1,14 +1,14 @@
 // components/CustomAlert.tsx
+import { Colors } from "@/constants/Colors";
 import { useEffect, useRef } from "react";
 import {
+  Animated,
   Modal,
-  View,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  Animated,
+  View,
 } from "react-native";
-import { Colors } from "@/constants/Colors";
 
 export interface AlertAction {
   text: string;
@@ -22,7 +22,7 @@ export interface CustomAlertConfig {
   title: string;
   message: string;
   actions?: AlertAction[];
-  autoDismiss?: boolean;       // automatically close after 2s (ignores actions)
+  autoDismiss?: boolean; // automatically close after 2s (ignores actions)
   onClose?: () => void;
 }
 
@@ -80,7 +80,13 @@ export function CustomAlert({
           {/* Optional icon */}
           <View style={[styles.iconCircle, { backgroundColor: accentColor }]}>
             <Text style={styles.iconText}>
-              {type === "success" ? "✓" : type === "error" ? "✕" : type === "warning" ? "!" : "i"}
+              {type === "success"
+                ? "✓"
+                : type === "error"
+                  ? "✕"
+                  : type === "warning"
+                    ? "!"
+                    : "i"}
             </Text>
           </View>
 
@@ -130,7 +136,7 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
     padding: 24,
   },
@@ -143,6 +149,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: Colors.border,
+    marginTop: 60,
   },
   iconCircle: {
     width: 48,
