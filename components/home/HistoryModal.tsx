@@ -1,7 +1,8 @@
 // components/home/HistoryModal.tsx
-import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { SleepEntry } from "@/types/sleep";
 import { getMonthlySummary } from "@/utils/analyticsHelpers";
+import { useFormattedTime } from "@/utils/formatTime";
 import { useMemo, useState } from "react";
 import {
   FlatList,
@@ -27,7 +28,6 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "6m", label: "6 Months" },
 ];
 
-// Quality verdict helper
 function getQualityVerdict(duration: number | null): string {
   if (duration === null) return "—";
   if (duration >= 7 && duration <= 9) return "Good";
@@ -36,7 +36,6 @@ function getQualityVerdict(duration: number | null): string {
   return "Fair";
 }
 
-// Helper to get start of a day N days ago
 const daysAgo = (n: number) => {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -46,11 +45,11 @@ const daysAgo = (n: number) => {
 
 export function HistoryModal({ visible, onClose, entries }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("7d");
+  const { colors } = useTheme();
+  const formatTime = useFormattedTime();
 
-  // Compute displayed data based on active tab
   const { individualEntries, monthlySummary } = useMemo(() => {
     const now = new Date();
-
     let start: Date;
     let end: Date;
 
@@ -93,22 +92,16 @@ export function HistoryModal({ visible, onClose, entries }: Props) {
     const sleep = new Date(entry.sleepTime);
     const wake = entry.wakeTime ? new Date(entry.wakeTime) : null;
 
-    const sleepStr = sleep.toLocaleString("en-US", {
+    const sleepStr = `${sleep.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
+    })} ${formatTime(sleep)}`;
 
     const wakeStr = wake
-      ? wake.toLocaleString("en-US", {
+      ? `${wake.toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        })
+        })} ${formatTime(wake)}`
       : "—";
 
     return `${sleepStr}  –  ${wakeStr}`;
@@ -117,11 +110,15 @@ export function HistoryModal({ visible, onClose, entries }: Props) {
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { backgroundColor: colors.card }]}>
           <View style={styles.header}>
-            <Text style={styles.title}>Sleep History</Text>
+            <Text style={[styles.title, { color: colors.foreground }]}>
+              Sleep History
+            </Text>
             <TouchableOpacity onPress={onClose}>
-              <Text style={styles.close}>Close</Text>
+              <Text style={[styles.close, { color: colors.primary }]}>
+                Close
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -129,13 +126,20 @@ export function HistoryModal({ visible, onClose, entries }: Props) {
             {TABS.map((tab) => (
               <TouchableOpacity
                 key={tab.key}
-                style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+                style={[
+                  styles.tab,
+                  activeTab === tab.key
+                    ? { backgroundColor: colors.primary }
+                    : { backgroundColor: colors.muted },
+                ]}
                 onPress={() => setActiveTab(tab.key)}
               >
                 <Text
                   style={[
                     styles.tabText,
-                    activeTab === tab.key && styles.tabTextActive,
+                    activeTab === tab.key
+                      ? { color: "#fff" }
+                      : { color: colors.foreground },
                   ]}
                 >
                   {tab.label}
@@ -144,7 +148,6 @@ export function HistoryModal({ visible, onClose, entries }: Props) {
             ))}
           </View>
 
-          {/* 6‑month aggregated view */}
           {activeTab === "6m" ? (
             monthlySummary && monthlySummary.length > 0 ? (
               <FlatList
@@ -153,13 +156,29 @@ export function HistoryModal({ visible, onClose, entries }: Props) {
                 showsVerticalScrollIndicator={false}
                 style={{ flex: 1 }}
                 renderItem={({ item }) => (
-                  <View style={styles.monthRow}>
-                    <Text style={styles.monthLabel}>{item.month}</Text>
+                  <View
+                    style={[
+                      styles.monthRow,
+                      { borderBottomColor: colors.border },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.monthLabel, { color: colors.foreground }]}
+                    >
+                      {item.month}
+                    </Text>
                     <View style={styles.monthStats}>
-                      <Text style={styles.monthTotal}>
+                      <Text
+                        style={[styles.monthTotal, { color: colors.accent }]}
+                      >
                         {item.totalHours.toFixed(1)} hrs
                       </Text>
-                      <Text style={styles.monthDetail}>
+                      <Text
+                        style={[
+                          styles.monthDetail,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
                         Avg {item.avgHours.toFixed(1)} · {item.nights} night
                         {item.nights !== 1 ? "s" : ""}
                       </Text>
@@ -168,12 +187,14 @@ export function HistoryModal({ visible, onClose, entries }: Props) {
                 )}
               />
             ) : (
-              <Text style={styles.empty}>
+              <Text style={[styles.empty, { color: colors.mutedForeground }]}>
                 No sleep data in the last 6 months.
               </Text>
             )
           ) : individualEntries.length === 0 ? (
-            <Text style={styles.empty}>No entries in this period.</Text>
+            <Text style={[styles.empty, { color: colors.mutedForeground }]}>
+              No entries in this period.
+            </Text>
           ) : (
             <FlatList
               data={individualEntries}
@@ -181,20 +202,31 @@ export function HistoryModal({ visible, onClose, entries }: Props) {
               showsVerticalScrollIndicator={false}
               style={{ flex: 1 }}
               renderItem={({ item }) => (
-                <View style={styles.item}>
+                <View
+                  style={[styles.item, { borderBottomColor: colors.border }]}
+                >
                   <View style={styles.leftBlock}>
-                    <Text style={styles.itemText}>{formatEntry(item)}</Text>
-                    <Text style={styles.duration}>
+                    <Text
+                      style={[styles.itemText, { color: colors.foreground }]}
+                    >
+                      {formatEntry(item)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.duration,
+                        { color: colors.mutedForeground },
+                      ]}
+                    >
                       {item.duration ? `${item.duration.toFixed(1)} hrs` : "—"}
                     </Text>
                   </View>
-
                   <View style={styles.rightBlock}>
                     <Text
                       style={[
                         styles.qualityLabel,
+                        { color: colors.textSecondary },
                         item.duration && item.duration >= 7
-                          ? styles.qualityGood
+                          ? { color: colors.success }
                           : null,
                       ]}
                     >
@@ -218,7 +250,6 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: Colors.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -233,11 +264,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "700",
-    color: Colors.foreground,
   },
   close: {
     fontSize: 16,
-    color: Colors.primary,
     fontWeight: "500",
   },
   tabBar: {
@@ -250,22 +279,13 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 16,
-    backgroundColor: Colors.muted,
-  },
-  tabActive: {
-    backgroundColor: Colors.primary,
   },
   tabText: {
     fontSize: 13,
     fontWeight: "500",
-    color: Colors.foreground,
-  },
-  tabTextActive: {
-    color: "#fff",
   },
   empty: {
     textAlign: "center",
-    color: Colors.mutedForeground,
     marginTop: 40,
     fontSize: 16,
   },
@@ -274,19 +294,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   leftBlock: {
     flex: 1,
   },
   itemText: {
     fontSize: 15,
-    color: Colors.foreground,
     fontWeight: "500",
   },
   duration: {
     fontSize: 13,
-    color: Colors.mutedForeground,
     marginTop: 4,
   },
   rightBlock: {
@@ -296,10 +313,6 @@ const styles = StyleSheet.create({
   qualityLabel: {
     fontSize: 12,
     fontWeight: "500",
-    color: Colors.textSecondary,
-  },
-  qualityGood: {
-    color: Colors.success,
   },
   monthRow: {
     flexDirection: "row",
@@ -307,12 +320,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   monthLabel: {
     fontSize: 15,
     fontWeight: "600",
-    color: Colors.foreground,
   },
   monthStats: {
     alignItems: "flex-end",
@@ -320,11 +331,9 @@ const styles = StyleSheet.create({
   monthTotal: {
     fontSize: 16,
     fontWeight: "700",
-    color: Colors.accent,
   },
   monthDetail: {
     fontSize: 12,
-    color: Colors.textSecondary,
     marginTop: 2,
   },
 });

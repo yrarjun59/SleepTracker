@@ -1,4 +1,4 @@
-import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { DayData } from "@/utils/analyticsHelpers";
 import { getSleepQuality, SLEEP_QUALITY_COLORS } from "@/utils/sleepQuality";
 import { StyleSheet, Text, View } from "react-native";
@@ -15,7 +15,16 @@ export function SleepBarChart({
   width,
   idealHoursPerDay = 8,
 }: SleepBarChartProps) {
+  const { colors } = useTheme();
+
   if (data.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+          No data available
+        </Text>
+      </View>
+    );
   }
 
   return (
@@ -23,13 +32,13 @@ export function SleepBarChart({
       {data.map((day, index) => {
         const idealTotal = day.daysInPeriod * idealHoursPerDay;
         const percent = Math.min((day.totalHours / idealTotal) * 100, 100);
-        const average = day.totalHours / day.daysInPeriod; // used for color
+        const average = day.totalHours / day.daysInPeriod;
         const quality = getSleepQuality(average);
         const barColor = SLEEP_QUALITY_COLORS[quality];
 
         return (
           <View key={index} style={styles.barWrapper}>
-            <View style={styles.bar}>
+            <View style={[styles.bar, { backgroundColor: colors.muted }]}>
               <View
                 style={[
                   styles.barFill,
@@ -40,7 +49,10 @@ export function SleepBarChart({
             <Text
               style={[
                 styles.barLabel,
-                { fontSize: data.length >= 12 ? 10 : 12 },
+                {
+                  color: colors.textSecondary,
+                  fontSize: data.length >= 12 ? 10 : 12,
+                },
               ]}
             >
               {day.date}
@@ -52,7 +64,6 @@ export function SleepBarChart({
   );
 }
 
-// styles unchanged
 const styles = StyleSheet.create({
   emptyContainer: {
     height: 180,
@@ -61,7 +72,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: Colors.mutedForeground,
   },
   chartContainer: {
     flexDirection: "row",
@@ -79,7 +89,6 @@ const styles = StyleSheet.create({
   bar: {
     width: "90%",
     maxWidth: 45,
-    backgroundColor: Colors.muted,
     height: "100%",
     justifyContent: "flex-end",
     overflow: "hidden",
@@ -90,7 +99,6 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   barLabel: {
-    color: Colors.textSecondary,
     marginTop: 6,
     textTransform: "uppercase",
   },

@@ -1,4 +1,4 @@
-import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -12,6 +12,8 @@ export function HoldToRecordButton({ onComplete }: Props) {
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressAnim = useRef<Animated.CompositeAnimation | null>(null);
   const hasFired = useRef(false);
+
+  const { colors } = useTheme();
 
   const startHold = () => {
     hasFired.current = false;
@@ -70,21 +72,13 @@ export function HoldToRecordButton({ onComplete }: Props) {
       pressRetentionOffset={{ top: 40, bottom: 40, left: 40, right: 40 }}
       style={styles.container}
     >
-      <View style={styles.outerCircle}>
-        {/* Liquid‑like fill (rises from bottom) */}
-        <Animated.View
-          style={[
-            styles.fill,
-            {
-              height: fillHeight,
-            },
-          ]}
+      <View style={[styles.outerCircle, { borderColor: colors.primary }]}>
+        <Animated.View style={[styles.fill, { height: fillHeight }]} />
+
+        <View
+          style={[styles.innerCircle, { backgroundColor: colors.primary }]}
         />
 
-        {/* Inner solid circle */}
-        <View style={styles.innerCircle} />
-
-        {/* Text stays on top */}
         <View style={styles.textLayer}>
           <Text style={styles.mainText}>
             {holding ? "Keep holding..." : "Wake Up"}
@@ -106,8 +100,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 2,
-    borderColor: Colors.primary,
-    justifyContent: "flex-end", // so fill anchors at bottom
+    justifyContent: "flex-end",
     alignItems: "center",
     overflow: "hidden",
     backgroundColor: "transparent",
@@ -119,19 +112,18 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: "#ffffff",
     opacity: 0.9,
-    borderBottomLeftRadius: 45, // match inner circle radius
+    borderBottomLeftRadius: 45,
     borderBottomRightRadius: 45,
-    zIndex: 0, // behind text, but above inner (default stacking)
+    zIndex: 0,
   },
   innerCircle: {
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: Colors.primary,
     position: "absolute",
     top: 1,
     left: 1,
-    zIndex: 1, // ensures it's behind the fill? Actually fill is after this in JSX so fill appears on top. Good.
+    zIndex: 1,
   },
   textLayer: {
     position: "absolute",
@@ -141,7 +133,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 2, // highest – always visible
+    zIndex: 2,
   },
   mainText: {
     color: "#FFFFFF",

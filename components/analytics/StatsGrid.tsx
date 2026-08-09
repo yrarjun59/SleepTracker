@@ -1,12 +1,11 @@
-// components/analytics/StatsGrid.tsx
-import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { DailyStats, MonthlyStats } from "@/utils/analyticsHelpers";
 import { StyleSheet, Text, View } from "react-native";
 
 interface StatsGridProps {
   stats: DailyStats | MonthlyStats;
   type: "daily" | "monthly";
-  scheduleConsistency?: { consistentNights: number; totalNights: number }; // only for daily
+  scheduleConsistency?: { consistentNights: number; totalNights: number };
 }
 
 export function StatsGrid({
@@ -14,6 +13,7 @@ export function StatsGrid({
   type,
   scheduleConsistency,
 }: StatsGridProps) {
+  const { colors } = useTheme();
   const isDaily = type === "daily";
 
   const StatCard = ({
@@ -25,11 +25,17 @@ export function StatsGrid({
     value: string;
     unit: string;
   }) => (
-    <View style={styles.card}>
-      <Text style={styles.cardLabel}>{label}</Text>
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>
+        {label}
+      </Text>
       <View style={styles.cardValueRow}>
-        <Text style={styles.cardValue}>{value}</Text>
-        <Text style={styles.cardUnit}>{unit}</Text>
+        <Text style={[styles.cardValue, { color: colors.foreground }]}>
+          {value}
+        </Text>
+        <Text style={[styles.cardUnit, { color: colors.textSecondary }]}>
+          {unit}
+        </Text>
       </View>
     </View>
   );
@@ -80,8 +86,6 @@ export function StatsGrid({
   );
 }
 
-// styles unchanged...
-
 const styles = StyleSheet.create({
   grid: {
     paddingHorizontal: 20,
@@ -94,11 +98,9 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    backgroundColor: Colors.card,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -108,7 +110,6 @@ const styles = StyleSheet.create({
   cardLabel: {
     fontSize: 11,
     fontWeight: "600",
-    color: Colors.mutedForeground,
     textTransform: "uppercase",
     letterSpacing: 0.8,
     marginBottom: 8,
@@ -121,10 +122,8 @@ const styles = StyleSheet.create({
   cardValue: {
     fontSize: 24,
     fontWeight: "700",
-    color: Colors.foreground,
   },
   cardUnit: {
     fontSize: 13,
-    color: Colors.textSecondary,
   },
 });

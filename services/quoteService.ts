@@ -1,13 +1,12 @@
-export interface SleepQuote {
-  text: string;
-  author: string;
-}
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const SLEEP_QUOTES: SleepQuote[] = [
-  {
-    text: "Sleep is the best meditation.",
-    author: "Dalai Lama",
-  },
+const QUOTE_CACHE_KEY = "@quote_cache";
+
+const API_URL =
+  "https://api.quotable.io/quotes?tags=sleep|rest|dreams&limit=30";
+//15+ curated offline quotes – all from real experts / reputable sources
+const OFFLINE_QUOTES: { text: string; author: string }[] = [
+  { text: "Sleep is the best meditation.", author: "Dalai Lama" },
   {
     text: "A good laugh and a long sleep are the best cures in the doctor's book.",
     author: "Irish Proverb",
@@ -36,10 +35,7 @@ const SLEEP_QUOTES: SleepQuote[] = [
     text: "Sleep is the most underrated health habit.",
     author: "Dr. Michael Breus",
   },
-  {
-    text: "A well-spent day brings happy sleep.",
-    author: "Leonardo da Vinci",
-  },
+  { text: "A well-spent day brings happy sleep.", author: "Leonardo da Vinci" },
   {
     text: "Sleep is an investment in the energy you need to be effective tomorrow.",
     author: "Tom Roth",
@@ -52,21 +48,76 @@ const SLEEP_QUOTES: SleepQuote[] = [
     text: "Sleep is the Swiss Army knife of health.",
     author: "Dr. Matthew Walker",
   },
-  {
-    text: "It is a common experience that a problem difficult at night is resolved in the morning after the committee of sleep has worked on it.",
-    author: "John Steinbeck",
-  },
-  {
-    text: "Sleep is not a luxury, it's a necessity.",
-    author: "Dr. James Maas",
-  },
-  {
-    text: "Your body is designed to sleep. Trust it.",
-    author: "Dr. Nerina Ramlakhan",
-  },
 ];
 
-export function getTodayQuote(): SleepQuote {
-  const dayIndex = new Date().getDate() % SLEEP_QUOTES.length;
-  return SLEEP_QUOTES[dayIndex];
+export interface Quote {
+  text: string;
+  author: string;
+}
+
+// Load quotes from cache or fallback offline list
+async function loadQuotes(): Promise<Quote[]> {
+  const json = await AsyncStorage.getItem(QUOTE_CACHE_KEY);
+  if (json) return JSON.parse(json);
+  return OFFLINE_QUOTES;
+}
+
+// Save quotes to cache
+async function saveQuotes(quotes: Quote[]) {
+  await AsyncStorage.setItem(QUOTE_CACHE_KEY, JSON.stringify(quotes));
+}
+
+// Fetch fresh quotes from the official Quotable API
+async function fetchQuotesFromAPI(): Promise<Quote[]> {
+  const response = await fetch(API_URL);
+  if (!response.ok) throw new Error("Failed to fetch quotes");
+  const data = await response.json();
+  return data.results.map((item: any) => ({
+    text: item.content,
+    author: item.author,
+  }));
+}
+
+// ---------- Public functions ----------
+
+/** Return a random quote from the current cache */
+export async function getTodayQuote(): Promise<Quote> {
+  const quotes = await loadQuotes();
+  const index = Math.floor(Math.random() * quotes.length);
+  return quotes[index];
+}
+
+/** Fetch new quotes from the API and replace the cache. Logs on success. */
+export async function refreshQuotes() {
+  try {
+    const fresh = await fetchQuotesFromAPI();
+    if (fresh.length > 0) {
+      await saveQuotes(fresh);
+      console.log("✅ Quotes updated from API");
+    }
+  } catch (error) {
+    console.warn(
+      "⚠️ Could not fetch quotes – using offline/cached quotes",
+      error,
+    );
+  }
+}
+
+// ---------- Hourly refresher ----------
+
+let refreshInterval: ReturnType<typeof setInterval> | null = null;
+
+/** Start the hourly quote refresh. Call once from your root component. */
+export function startQuoteRefresher() {
+  refreshQuotes();
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(refreshQuotes, 60 * 60 * 1000); // every hour
+}
+
+/** Stop the hourly refresh. Call on cleanup. */
+export function stopQuoteRefresher() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+  }
 }

@@ -1,5 +1,5 @@
 // components/CustomAlert.tsx
-import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useEffect, useRef } from "react";
 import {
   Animated,
@@ -22,7 +22,7 @@ export interface CustomAlertConfig {
   title: string;
   message: string;
   actions?: AlertAction[];
-  autoDismiss?: boolean; // automatically close after 2s (ignores actions)
+  autoDismiss?: boolean;
   onClose?: () => void;
 }
 
@@ -35,6 +35,7 @@ export function CustomAlert({
   autoDismiss = false,
   onClose,
 }: CustomAlertConfig) {
+  const { colors } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -45,7 +46,6 @@ export function CustomAlert({
         useNativeDriver: true,
       }).start();
 
-      // Auto-dismiss for success / info after 2 seconds
       if (autoDismiss) {
         const timer = setTimeout(() => {
           onClose?.();
@@ -57,13 +57,13 @@ export function CustomAlert({
     }
   }, [visible, autoDismiss]);
 
-  // Determine the accent color based on type
+  // Determine accent color based on type
   const accentColor = {
-    info: Colors.accent,
-    success: Colors.success,
-    error: Colors.destructive,
-    warning: Colors.warning,
-    confirm: Colors.accent,
+    info: colors.accent,
+    success: colors.success,
+    error: colors.destructive,
+    warning: colors.warning,
+    confirm: colors.accent,
   }[type];
 
   return (
@@ -76,8 +76,16 @@ export function CustomAlert({
       }}
     >
       <View style={styles.overlay}>
-        <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-          {/* Optional icon */}
+        <Animated.View
+          style={[
+            styles.container,
+            {
+              opacity: fadeAnim,
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+            },
+          ]}
+        >
           <View style={[styles.iconCircle, { backgroundColor: accentColor }]}>
             <Text style={styles.iconText}>
               {type === "success"
@@ -90,10 +98,13 @@ export function CustomAlert({
             </Text>
           </View>
 
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>
+            {title}
+          </Text>
+          <Text style={[styles.message, { color: colors.textSecondary }]}>
+            {message}
+          </Text>
 
-          {/* Buttons – hidden for auto-dismiss alerts */}
           {!autoDismiss && actions.length > 0 && (
             <View style={styles.buttonRow}>
               {actions.map((action, i) => {
@@ -104,8 +115,15 @@ export function CustomAlert({
                     key={i}
                     style={[
                       styles.button,
-                      isCancel && styles.cancelButton,
-                      isDestructive && styles.destructiveButton,
+                      isCancel
+                        ? [styles.cancelButton, { borderColor: colors.border }]
+                        : {},
+                      isDestructive
+                        ? { backgroundColor: colors.destructive }
+                        : {},
+                      !isCancel && !isDestructive
+                        ? { backgroundColor: colors.accent }
+                        : {},
                     ]}
                     onPress={() => {
                       action.onPress();
@@ -115,8 +133,9 @@ export function CustomAlert({
                     <Text
                       style={[
                         styles.buttonText,
-                        isCancel && { color: Colors.textSecondary },
+                        isCancel && { color: colors.textSecondary },
                         isDestructive && { color: "#FFFFFF" },
+                        !isCancel && !isDestructive && { color: "#FFFFFF" },
                       ]}
                     >
                       {action.text}
@@ -141,14 +160,12 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   container: {
-    backgroundColor: Colors.card,
     borderRadius: 20,
     padding: 24,
     width: "100%",
     maxWidth: 320,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: Colors.border,
     marginTop: 60,
   },
   iconCircle: {
@@ -167,13 +184,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: "600",
-    color: Colors.foreground,
     marginBottom: 8,
     textAlign: "center",
   },
   message: {
     fontSize: 14,
-    color: Colors.textSecondary,
     textAlign: "center",
     lineHeight: 20,
     marginBottom: 24,
@@ -187,20 +202,14 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: Colors.accent,
     alignItems: "center",
   },
   cancelButton: {
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  destructiveButton: {
-    backgroundColor: Colors.destructive,
   },
   buttonText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#FFFFFF",
   },
 });

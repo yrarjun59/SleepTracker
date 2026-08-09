@@ -1,5 +1,4 @@
-// components/profile/SettingsRow.tsx
-import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -18,25 +17,32 @@ export function SettingsRow({
   onPress,
   showArrow = true,
 }: SettingsRowProps) {
+  const { colors } = useTheme();
+
   return (
     <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.left}>
         <View
           style={[
             styles.iconBox,
-            destructive
-              ? { backgroundColor: Colors.destructive + "20" }
-              : { backgroundColor: Colors.accent + "20" },
+            {
+              backgroundColor: destructive
+                ? colors.destructive + "20"
+                : colors.accent + "20",
+            },
           ]}
         >
           <Ionicons
             name={icon}
             size={18}
-            color={destructive ? Colors.destructive : Colors.accent}
+            color={destructive ? colors.destructive : colors.accent}
           />
         </View>
         <Text
-          style={[styles.label, destructive && { color: Colors.destructive }]}
+          style={[
+            styles.label,
+            { color: destructive ? colors.destructive : colors.foreground },
+          ]}
         >
           {label}
         </Text>
@@ -45,7 +51,7 @@ export function SettingsRow({
         <Ionicons
           name="chevron-forward"
           size={16}
-          color={Colors.mutedForeground}
+          color={colors.mutedForeground}
         />
       )}
     </TouchableOpacity>
@@ -75,6 +81,5 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 15,
     fontWeight: "500",
-    color: Colors.foreground,
   },
 });

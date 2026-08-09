@@ -1,4 +1,4 @@
-import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -7,7 +7,6 @@ interface WeeklyComparisonCardProps {
   lastWeek: number | null;
   differenceMinutes: number | null;
 }
-
 
 function formatDifference(minutes: number): string {
   const abs = Math.abs(minutes);
@@ -28,20 +27,28 @@ export function WeeklyComparisonCard({
     thisWeek !== null && lastWeek !== null && differenceMinutes !== null;
   const isBetter = hasBothWeeks ? differenceMinutes >= 0 : false;
 
+  const { colors } = useTheme();
+
   return (
-    <View style={styles.card}>
-      <Text style={styles.label}>THIS WEEK VS LAST WEEK</Text>
+    <View style={[styles.card, { backgroundColor: colors.muted }]}>
+      <Text style={[styles.label, { color: colors.mutedForeground }]}>
+        THIS WEEK VS LAST WEEK
+      </Text>
 
       <View style={styles.stats}>
         <View style={styles.statRow}>
-          <Text style={styles.statLabel}>This week:</Text>
-          <Text style={[styles.statValue, { color: Colors.primary }]}>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+            This week:
+          </Text>
+          <Text style={[styles.statValue, { color: colors.foreground }]}>
             {thisWeek !== null ? `${thisWeek.toFixed(1)} hrs` : "— hrs"}
           </Text>
         </View>
         <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Last week:</Text>
-          <Text style={styles.statValue}>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+            Last week:
+          </Text>
+          <Text style={[styles.statValue, { color: colors.foreground }]}>
             {lastWeek !== null ? `${lastWeek.toFixed(1)} hrs` : "— hrs"}
           </Text>
         </View>
@@ -54,12 +61,12 @@ export function WeeklyComparisonCard({
           <Ionicons
             name={isBetter ? "arrow-up" : "arrow-down"}
             size={16}
-            color={isBetter ? Colors.accent : Colors.destructive}
+            color={isBetter ? colors.accent : colors.destructive}
           />
           <Text
             style={[
               styles.badgeText,
-              { color: isBetter ? Colors.accent : Colors.destructive },
+              { color: isBetter ? colors.accent : colors.destructive },
             ]}
           >
             {isBetter ? "+" : "−"}
@@ -68,8 +75,10 @@ export function WeeklyComparisonCard({
           </Text>
         </View>
       ) : (
-        <View style={styles.badgeNeutral}>
-          <Text style={styles.badgeNeutralText}>
+        <View style={[styles.badgeNeutral, { backgroundColor: colors.muted }]}>
+          <Text
+            style={[styles.badgeNeutralText, { color: colors.mutedForeground }]}
+          >
             Not enough data to compare
           </Text>
         </View>
@@ -77,7 +86,6 @@ export function WeeklyComparisonCard({
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   badgeNeutral: {
@@ -87,14 +95,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: Colors.muted,
   },
   badgeNeutralText: {
     fontSize: 14,
-    color: Colors.mutedForeground,
   },
   card: {
-    backgroundColor: Colors.muted,
     marginHorizontal: 20,
     borderRadius: 16,
     padding: 20,
@@ -103,7 +108,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: "500",
-    color: Colors.mutedForeground,
     letterSpacing: 0.8,
     marginBottom: 16,
   },
@@ -118,12 +122,10 @@ const styles = StyleSheet.create({
   statLabel: {
     width: 96,
     fontSize: 14,
-    color: Colors.textSecondary,
   },
   statValue: {
     fontSize: 16,
     fontWeight: "700",
-    color: Colors.foreground,
   },
   badge: {
     flexDirection: "row",

@@ -1,5 +1,5 @@
-import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
-import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface SecondaryActionsProps {
   onViewHistory: () => void;
@@ -10,22 +10,28 @@ export function SecondaryActions({
   onViewHistory,
   onAddPastSleep,
 }: SecondaryActionsProps) {
+  const { colors } = useTheme();
+
   return (
     <View style={styles.container}>
       <TouchableOpacity
-        style={styles.button}
+        style={[styles.button, { borderColor: colors.border }]}
         onPress={onViewHistory}
         activeOpacity={0.7}
       >
-        <Text style={styles.text}>View History</Text>
+        <Text style={[styles.text, { color: colors.primary }]}>
+          View History
+        </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={styles.button}
+        style={[styles.button, { borderColor: colors.border }]}
         onPress={onAddPastSleep}
         activeOpacity={0.7}
       >
-        <Text style={styles.text}>Add Past Sleep</Text>
+        <Text style={[styles.text, { color: colors.primary }]}>
+          Add Past Sleep
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -41,7 +47,6 @@ const styles = StyleSheet.create({
   button: {
     flex: 1,
     borderWidth: 1,
-    borderColor: Colors.border,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",
@@ -50,6 +55,5 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 14,
     fontWeight: "500",
-    color: Colors.primary,
   },
 });

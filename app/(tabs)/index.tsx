@@ -1,4 +1,4 @@
-import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useEffect, useLayoutEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -22,18 +22,21 @@ import { WeeklyComparisonCard } from "@/components/home/WeeklyComparisonCard";
 
 import { useSleepEntries } from "@/hooks/useSleepEntries";
 import { useWeeklyStats } from "@/hooks/useWeeklyStats";
-import { parseLocalDateTime } from "@/utils/dateHelpers";
-
 import {
   formatDuration,
-  formatTime,
-  getDateLabel,
   getElapsedMinutes,
   getElapsedTime,
+  parseLocalDateTime,
 } from "@/utils/dateHelpers";
 
 import * as NavigationBar from "expo-navigation-bar";
 import { useNavigation, usePathname } from "expo-router";
+
+import { FirstTimeSetup } from "@/components/onboarding/FirstTimeSetupModal";
+import { useNotifications } from "@/contexts/NotificationContext";
+
+import { useFormattedTime } from "@/utils/formatTime";
+import * as Haptics from "expo-haptics";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -55,7 +58,15 @@ export default function HomeScreen() {
 
   const isSleeping = !!incomplete;
 
-  // Live timer
+  const { prefs } = useNotifications();
+  const [showOnboarding, setShowOnboarding] = useState(!prefs.setupComplete);
+
+  const navigation = useNavigation();
+  const pathname = usePathname();
+
+  const { colors } = useTheme(); // 👈 theme hook
+
+  // live timer for sleep
   useEffect(() => {
     if (!incomplete) {
       setElapsedLabel("0m");
@@ -70,34 +81,28 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [incomplete]);
 
-  const navigation = useNavigation();
-
   useLayoutEffect(() => {
     navigation.setOptions({
       tabBarStyle: {
-        // Keep the shared styling from _layout.tsx
-        backgroundColor: Colors.card,
-        borderTopColor: Colors.border,
+        backgroundColor: colors.card, // 👈 dynamic
+        borderTopColor: colors.border, // 👈 dynamic
         borderTopWidth: 1,
         height: 60,
         paddingBottom: 8,
         paddingTop: 8,
-        // Only toggle visibility
         display: isSleeping ? "none" : "flex",
       },
     });
-  }, [isSleeping, navigation]);
+  }, [isSleeping, navigation, colors]);
 
   useEffect(() => {
     if (!isSleeping) return;
 
-    // Block Android back button
     const backHandler = BackHandler.addEventListener(
       "hardwareBackPress",
       () => true,
     );
 
-    // Hide Android navigation bar
     if (Platform.OS === "android") {
       NavigationBar.setVisibilityAsync("hidden").catch(() => {});
     }
@@ -110,7 +115,25 @@ export default function HomeScreen() {
     };
   }, [isSleeping]);
 
-  const pathname = usePathname();
+  const formatTime = useFormattedTime();
+  const [currentTime, setCurrentTime] = useState("");
+
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const day = now.toLocaleDateString("en-US", { weekday: "long" });
+      const date = now.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      const time = formatTime(now);
+      const seconds = now.getSeconds().toString().padStart(2, "0");
+      setCurrentTime(`${day}, ${date}  ${time}:${seconds}`);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [formatTime]);
 
   useEffect(() => {
     if (pathname === "/") {
@@ -120,6 +143,7 @@ export default function HomeScreen() {
 
   // ---------- Handlers ----------
   const handleRecord = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await startSleep();
   };
 
@@ -127,12 +151,17 @@ export default function HomeScreen() {
     const minutes = getElapsedMinutes(incomplete!.sleepTime);
     try {
       if (minutes >= 10) {
-        await finishSleep(); // save the entry
+        await finishSleep();
+        await Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success,
+        );
       } else {
-        await abortSleep(); // discard silently
+        await abortSleep();
+        await Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Warning,
+        );
       }
     } catch (error: any) {
-      // fallback – just abort if anything goes wrong
       await abortSleep();
     }
   };
@@ -144,7 +173,7 @@ export default function HomeScreen() {
         <View style={[styles.sleepingContent, { paddingTop: insets.top }]}>
           <Text style={styles.sleepingLabel}>SLEEPING</Text>
           <Text style={styles.sleepingSince}>
-            Since {formatTime(incomplete.sleepTime)}
+            Since {formatTime(parseLocalDateTime(incomplete.sleepTime))}
           </Text>
           <Text style={styles.sleepingTimer}>{elapsedLabel}</Text>
 
@@ -157,8 +186,14 @@ export default function HomeScreen() {
   // ========== Loading ==========
   if (loading) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+      <View
+        style={[
+          styles.container,
+          styles.centered,
+          { backgroundColor: colors.background },
+        ]}
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -184,22 +219,27 @@ export default function HomeScreen() {
 
   // ========== NORMAL MODE ==========
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View
+      style={[
+        styles.container,
+        { paddingTop: insets.top, backgroundColor: colors.background },
+      ]}
+    >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <HomeHeader date={getDateLabel()} />
+        <HomeHeader date={currentTime} />
 
         <TodaySleepCard
           sleepTime={
             todayEntries.length === 1
-              ? formatTime(todayEntries[0].sleepTime)
+              ? formatTime(parseLocalDateTime(todayEntries[0].sleepTime))
               : null
           }
           wakeTime={
             todayEntries.length === 1
-              ? formatTime(todayEntries[0].wakeTime)
+              ? formatTime(parseLocalDateTime(todayEntries[0].wakeTime!))
               : null
           }
           duration={
@@ -238,6 +278,11 @@ export default function HomeScreen() {
         onClose={() => setShowHistoryModal(false)}
         entries={entries}
       />
+
+      <FirstTimeSetup
+        visible={showOnboarding}
+        onDismiss={() => setShowOnboarding(false)}
+      />
     </View>
   );
 }
@@ -245,7 +290,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   centered: {
     justifyContent: "center",
@@ -254,8 +298,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 24,
   },
-
-  // ===== Full screen night mode =====
   sleepingScreen: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "#0B140F",

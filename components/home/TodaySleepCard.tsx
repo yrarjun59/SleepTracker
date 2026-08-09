@@ -1,8 +1,11 @@
-import { Colors } from "@/constants/Colors";
-import { getTodayQuote, SleepQuote } from "@/services/quoteService";
+// components/home/TodaySleepCard.tsx
+import { useTheme } from "@/contexts/ThemeContext";
+import { getTodayQuote, Quote } from "@/services/quoteService";
 import { SleepEntry } from "@/types/sleep";
 import { parseLocalDateTime } from "@/utils/dateHelpers";
+import { useFormattedTime } from "@/utils/formatTime";
 import { Ionicons } from "@expo/vector-icons";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 function getRelativeTimeLabel(lastWake: Date): string {
@@ -51,18 +54,24 @@ export function TodaySleepCard({
   napCount = 1,
   lastCompletedEntry,
 }: TodaySleepCardProps) {
-  // const quote = SLEEP_QUOTES[new Date().getDate() % SLEEP_QUOTES.length];
-  const quote: SleepQuote = getTodayQuote();
+  const [quote, setQuote] = useState<Quote>({ text: "", author: "" });
+  const { colors } = useTheme();
+  const formatTime = useFormattedTime();
 
-  // ----- derive awake duration from last completed entry -----
+  useEffect(() => {
+    (async () => {
+      const q = await getTodayQuote();
+      setQuote(q);
+    })();
+  }, []);
+
+  // derive awake duration from last completed entry
   let hoursAwake: number | null = null;
-
   if (lastCompletedEntry?.wakeTime) {
     const lastWake = parseLocalDateTime(lastCompletedEntry.wakeTime);
     hoursAwake = (Date.now() - lastWake.getTime()) / (1000 * 60 * 60);
   }
 
-  // ----- labels (unchanged) -----
   const isNap =
     napCount === 1 && durationHours !== undefined && durationHours < 2;
   const topLabel = isSleeping
@@ -73,11 +82,15 @@ export function TodaySleepCard({
         ? "TODAY'S NAP"
         : "TODAY'S SLEEP";
 
-  // ----- always visible quote section -----
+  // always visible quote section
   const quoteSection = (
     <View style={styles.quoteBlock}>
-      <Text style={styles.quoteText}>“{quote.text}”</Text>
-      <Text style={styles.quoteAuthor}>— {quote.author}</Text>
+      <Text style={[styles.quoteText, { color: colors.foreground }]}>
+        “{quote.text}”
+      </Text>
+      <Text style={[styles.quoteAuthor, { color: colors.textSecondary }]}>
+        — {quote.author}
+      </Text>
     </View>
   );
 
@@ -85,8 +98,12 @@ export function TodaySleepCard({
     if (isSleeping) {
       return (
         <View style={styles.sleepingContainer}>
-          <Text style={styles.sleepingSince}>Sleeping since {sleepTime}</Text>
-          <Text style={styles.elapsed}>{elapsedLabel ?? "0m"}</Text>
+          <Text style={[styles.sleepingSince, { color: colors.textSecondary }]}>
+            Sleeping since {sleepTime}
+          </Text>
+          <Text style={[styles.elapsed, { color: colors.primary }]}>
+            {elapsedLabel ?? "0m"}
+          </Text>
         </View>
       );
     }
@@ -98,23 +115,21 @@ export function TodaySleepCard({
       const fmt = (d: Date) =>
         d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
         " " +
-        d.toLocaleTimeString([], {
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        });
+        formatTime(d);
 
       const detailsLine = (
-        <Text style={styles.lastSleepDetail}>
+        <Text style={[styles.lastSleepDetail, { color: colors.textSecondary }]}>
           {fmt(lastSleep)} – {fmt(lastWake)}
         </Text>
       );
 
       if (hoursAwake < 18) {
         return (
-          <View style={styles.recentSleep}>
+          <View style={[styles.recentSleep, { borderTopColor: colors.border }]}>
             <Text style={{ fontSize: 14, marginRight: 4 }}>☀️</Text>
-            <Text style={styles.recentSleepText}>
+            <Text
+              style={[styles.recentSleepText, { color: colors.textSecondary }]}
+            >
               wake since {getShortRelativeTime(hoursAwake)}
             </Text>
             {detailsLine}
@@ -122,14 +137,14 @@ export function TodaySleepCard({
         );
       } else {
         return (
-          <View style={styles.reminder}>
+          <View style={[styles.reminder, { borderTopColor: colors.border }]}>
             <Ionicons
               name="bed-outline"
               size={14}
-              color={Colors.accent}
+              color={colors.accent}
               style={{ marginRight: 4 }}
             />
-            <Text style={[styles.reminderText, { color: Colors.accent }]}>
+            <Text style={[styles.reminderText, { color: colors.accent }]}>
               last record{" "}
               {getRelativeTimeLabel(new Date(lastCompletedEntry.wakeTime!))} ago
               – time for some rest?
@@ -143,18 +158,19 @@ export function TodaySleepCard({
   };
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.label}>{topLabel}</Text>
+    <View style={[styles.card, { backgroundColor: colors.card }]}>
+      <Text style={[styles.label, { color: colors.mutedForeground }]}>
+        {topLabel}
+      </Text>
       {quoteSection}
       {renderBelow()}
     </View>
   );
 }
 
-// ================= Styles =================
+// Base styles (static properties only)
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.card,
     marginHorizontal: 20,
     borderRadius: 16,
     padding: 20,
@@ -168,43 +184,8 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: "500",
-    color: Colors.mutedForeground,
     letterSpacing: 0.8,
     marginBottom: 16,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-  },
-  times: {
-    gap: 6,
-  },
-  timeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  timeLabel: {
-    width: 48,
-    fontSize: 16,
-    color: Colors.textSecondary,
-  },
-  timeValue: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: Colors.foreground,
-  },
-  durationContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    position: "relative",
-  },
-  duration: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: Colors.primary,
   },
   sleepingContainer: {
     alignItems: "center",
@@ -212,52 +193,11 @@ const styles = StyleSheet.create({
   },
   sleepingSince: {
     fontSize: 16,
-    color: Colors.textSecondary,
     marginBottom: 8,
   },
   elapsed: {
     fontSize: 36,
     fontWeight: "700",
-    color: Colors.primary,
-  },
-  emptyContainer: {
-    alignItems: "center",
-    paddingVertical: 12,
-  },
-  quote: {
-    fontSize: 16,
-    fontStyle: "italic",
-    color: Colors.foreground,
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 10,
-  },
-  emptyHint: {
-    fontSize: 13,
-    color: Colors.mutedForeground,
-  },
-  multiNap: {
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  totalDuration: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: Colors.primary,
-    marginBottom: 4,
-  },
-  napSubtext: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  napBadge: {
-    fontSize: 12,
-    color: Colors.accent,
-    fontWeight: "600",
-    marginTop: 2,
-    position: "absolute",
-    top: "100%",
-    left: 0,
   },
   recentSleep: {
     flexDirection: "row",
@@ -265,11 +205,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
   },
   recentSleepText: {
     fontSize: 13,
-    color: Colors.textSecondary,
     flex: 1,
   },
   reminder: {
@@ -278,24 +216,16 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
   },
   reminderText: {
     fontSize: 13,
-    color: Colors.warning,
     flex: 1,
-  },
-  quoteContainer: {
-    alignItems: "center",
-    paddingVertical: 12,
   },
   lastSleepDetail: {
     fontSize: 12,
-    color: Colors.textSecondary,
     marginTop: 4,
     textAlign: "center",
   },
-
   quoteBlock: {
     alignItems: "center",
     marginBottom: 10,
@@ -303,13 +233,11 @@ const styles = StyleSheet.create({
   quoteText: {
     fontSize: 16,
     fontStyle: "italic",
-    color: Colors.foreground,
     textAlign: "center",
     lineHeight: 24,
   },
   quoteAuthor: {
     fontSize: 13,
-    color: Colors.textSecondary,
     marginTop: 6,
   },
 });

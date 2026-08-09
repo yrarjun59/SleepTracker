@@ -44,3 +44,10 @@ yarn-error.*
 .claude/
 .vscode/
 eas.json
+.agents/
+google-services.json
+firebase.json
+firestore.indexes.json
+firestore.rules
+progress.md
+skills-lock.json

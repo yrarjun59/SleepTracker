@@ -56,6 +56,11 @@ export async function addManualEntry(
   await saveAll(all);
   return newEntry;
 }
+export async function deleteEntry(id: string): Promise<void> {
+  const all = await getAll();
+  const filtered = all.filter((e) => e.id !== id);
+  await saveAll(filtered);
+}
 
 export async function clearAllData(): Promise<void> {
   await AsyncStorage.multiRemove([STORAGE_KEY, INCOMPLETE_KEY]);

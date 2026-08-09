@@ -1,4 +1,4 @@
-import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { StyleSheet, Text, TouchableOpacity } from "react-native";
 
 interface RecordButtonProps {
@@ -7,9 +7,11 @@ interface RecordButtonProps {
 }
 
 export function RecordButton({ title, onPress }: RecordButtonProps) {
+  const { colors } = useTheme();
+
   return (
     <TouchableOpacity
-      style={styles.button}
+      style={[styles.button, { backgroundColor: colors.primary }]}
       onPress={onPress}
       activeOpacity={0.8}
       accessibilityLabel={title}
@@ -21,11 +23,10 @@ export function RecordButton({ title, onPress }: RecordButtonProps) {
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: Colors.primary,
-    width: 100, // finger‑friendly diameter
+    width: 100,
     height: 100,
-    borderRadius: 50, // fully round
-    alignSelf: "center", // centered horizontally
+    borderRadius: 50,
+    alignSelf: "center",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,

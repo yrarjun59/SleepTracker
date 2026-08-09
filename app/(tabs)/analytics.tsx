@@ -4,7 +4,7 @@ import { SleepBarChart } from "@/components/analytics/SleepBarChart";
 import { StatsGrid } from "@/components/analytics/StatsGrid";
 import { TimeFrameSelector } from "@/components/analytics/TimeFrameSelector";
 import { HistoryModal } from "@/components/home/HistoryModal";
-import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useSleepEntries } from "@/hooks/useSleepEntries";
 import {
   DayData,
@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function AnalyticsScreen() {
   const insets = useSafeAreaInsets();
   const { entries, refresh } = useSleepEntries();
+  const { colors } = useTheme();
 
   const [activePeriod, setActivePeriod] = useState<
     "Week" | "Month" | "Year" | "All"
@@ -98,7 +99,7 @@ export default function AnalyticsScreen() {
   // ----------------------------------------------
   // 3. Horizontal scrolling (for 12+ bars)
   // ----------------------------------------------
-  const needsScroll = chartData.length >= 12; // changed to >= so year view scrolls
+  const needsScroll = chartData.length >= 12;
   const chartWidth = needsScroll ? chartData.length * 35 : undefined;
 
   // ----------------------------------------------
@@ -122,27 +123,51 @@ export default function AnalyticsScreen() {
   // 5. Render
   // ----------------------------------------------
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View
+      style={[
+        styles.container,
+        { paddingTop: insets.top, backgroundColor: colors.background },
+      ]}
+    >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.screenTitle}>Analytics</Text>
+        <Text style={[styles.screenTitle, { color: colors.foreground }]}>
+          Analytics
+        </Text>
 
         <TimeFrameSelector active={activePeriod} onSelect={setActivePeriod} />
 
         {/* Bar chart card */}
-        <View style={styles.chartCard}>
+        <View
+          style={[
+            styles.chartCard,
+            {
+              backgroundColor: colors.card,
+              borderColor: "rgba(255,255,255,0.05)",
+            },
+          ]}
+        >
           <View style={styles.chartHeader}>
-            <Text style={styles.chartTitle}>{chartTitle}</Text>
+            <Text style={[styles.chartTitle, { color: colors.foreground }]}>
+              {chartTitle}
+            </Text>
             <View style={styles.dateRange}>
               <Ionicons
                 name="calendar-outline"
                 size={14}
-                color={Colors.mutedForeground}
+                color={colors.mutedForeground}
                 style={{ marginRight: 4 }}
               />
-              <Text style={styles.dateRangeText}>{dateRangeText}</Text>
+              <Text
+                style={[
+                  styles.dateRangeText,
+                  { color: colors.mutedForeground },
+                ]}
+              >
+                {dateRangeText}
+              </Text>
             </View>
           </View>
 
@@ -155,14 +180,11 @@ export default function AnalyticsScreen() {
               <SleepBarChart
                 data={chartData}
                 width={chartWidth}
-                idealHoursPerDay={8} // consistent goal
+                idealHoursPerDay={8}
               />
             </ScrollView>
           ) : (
-            <SleepBarChart
-              data={chartData}
-              idealHoursPerDay={8} // removed maxValue, use idealHoursPerDay
-            />
+            <SleepBarChart data={chartData} idealHoursPerDay={8} />
           )}
         </View>
 
@@ -190,12 +212,9 @@ export default function AnalyticsScreen() {
   );
 }
 
-// styles unchanged...
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   scrollContent: {
     paddingBottom: 24,
@@ -203,19 +222,16 @@ const styles = StyleSheet.create({
   screenTitle: {
     fontSize: 28,
     fontWeight: "700",
-    color: Colors.foreground,
     paddingHorizontal: 20,
     marginBottom: 20,
     marginTop: 8,
   },
   chartCard: {
-    backgroundColor: Colors.card,
     marginHorizontal: 20,
     borderRadius: 20,
     padding: 20,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -231,7 +247,6 @@ const styles = StyleSheet.create({
   chartTitle: {
     fontSize: 15,
     fontWeight: "600",
-    color: Colors.foreground,
   },
   dateRange: {
     flexDirection: "row",
@@ -240,9 +255,5 @@ const styles = StyleSheet.create({
   },
   dateRangeText: {
     fontSize: 12,
-    color: Colors.mutedForeground,
-  },
-  weeklyWrapper: {
-    marginBottom: 24,
   },
 });

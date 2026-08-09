@@ -1,6 +1,6 @@
-import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { SleepEntry } from "@/types/sleep";
-import { formatTime } from "@/utils/dateHelpers";
+import { useFormattedTime } from "@/utils/formatTime";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface RecentEntriesListProps {
@@ -20,6 +20,9 @@ export function RecentEntriesList({
   entries,
   onViewAll,
 }: RecentEntriesListProps) {
+  const formatTime = useFormattedTime();
+
+  const { colors } = useTheme();
   const recent = entries
     .filter((e) => e.wakeTime !== null)
     .sort(
@@ -31,15 +34,26 @@ export function RecentEntriesList({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.sectionTitle}>Recent Entries</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+          Recent Entries
+        </Text>
         <TouchableOpacity onPress={onViewAll} activeOpacity={0.6}>
-          <Text style={styles.viewAll}>View All</Text>
+          <Text style={[styles.viewAll, { color: colors.accent }]}>
+            View All
+          </Text>
         </TouchableOpacity>
       </View>
 
       {recent.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>No sleep records yet.</Text>
+        <View
+          style={[
+            styles.emptyCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            No sleep records yet.
+          </Text>
         </View>
       ) : (
         recent.map((item) => {
@@ -50,26 +64,42 @@ export function RecentEntriesList({
             day: "numeric",
             year: "numeric",
           });
-          const wakeTimeFormatted = wakeDate ? formatTime(item.wakeTime) : "—";
+          const wakeTimeFormatted = wakeDate ? formatTime(wakeDate) : "—";
           const durationFormatted = item.duration
             ? `${item.duration.toFixed(1)} hrs`
             : "—";
           const quality = getQualityVerdict(item.duration);
 
           return (
-            <View key={item.id} style={styles.entryCard}>
+            <View
+              key={item.id}
+              style={[
+                styles.entryCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
               <View style={styles.left}>
-                <Text style={styles.entryDate}>{dateFormatted}</Text>
-                <Text style={styles.entryWakeTime}>
+                <Text style={[styles.entryDate, { color: colors.foreground }]}>
+                  {dateFormatted}
+                </Text>
+                <Text
+                  style={[
+                    styles.entryWakeTime,
+                    { color: colors.textSecondary },
+                  ]}
+                >
                   {wakeTimeFormatted} Wakeup
                 </Text>
               </View>
               <View style={styles.right}>
-                <Text style={styles.entryDuration}>{durationFormatted}</Text>
+                <Text style={[styles.entryDuration, { color: colors.accent }]}>
+                  {durationFormatted}
+                </Text>
                 <Text
                   style={[
                     styles.quality,
-                    quality === "Good" && styles.qualityGood,
+                    { color: colors.textSecondary },
+                    quality === "Good" && { color: colors.success },
                   ]}
                 >
                   {quality}
@@ -97,27 +127,21 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: Colors.foreground,
   },
   viewAll: {
     fontSize: 13,
-    color: Colors.accent,
     fontWeight: "500",
   },
   emptyCard: {
-    backgroundColor: Colors.card,
     borderRadius: 16,
     padding: 20,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   emptyText: {
-    color: Colors.textSecondary,
     fontSize: 14,
   },
   entryCard: {
-    backgroundColor: Colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 10,
@@ -125,7 +149,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   left: {
     flex: 1,
@@ -133,12 +156,10 @@ const styles = StyleSheet.create({
   entryDate: {
     fontSize: 15,
     fontWeight: "600",
-    color: Colors.foreground,
     marginBottom: 2,
   },
   entryWakeTime: {
     fontSize: 13,
-    color: Colors.textSecondary,
   },
   right: {
     alignItems: "flex-end",
@@ -146,15 +167,10 @@ const styles = StyleSheet.create({
   entryDuration: {
     fontSize: 18,
     fontWeight: "700",
-    color: Colors.accent,
     marginBottom: 2,
   },
   quality: {
     fontSize: 12,
     fontWeight: "500",
-    color: Colors.textSecondary,
-  },
-  qualityGood: {
-    color: Colors.success,
   },
 });

@@ -1,65 +1,49 @@
+// app/(tabs)/profile.tsx
+import { NotificationSettingsModal } from "@/components/profile/NotificationSettingsModal";
 import { SettingsRow } from "@/components/profile/SettingsRow";
-import { Colors } from "@/constants/Colors";
 import { useAlert } from "@/contexts/AlertContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSettings } from "@/contexts/SettingsContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { deleteAllUserEntries, pushEntry } from "@/services/cloudStorage";
 import * as sleepStorage from "@/services/sleepStorage";
 import { SleepEntry } from "@/types/sleep";
 import { entriesToCSV, parseCSV } from "@/utils/csvHelper";
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import { useState } from "react";
-
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ProfileScreen() {
+  const [showNotifSettings, setShowNotifSettings] = useState(false);
   const insets = useSafeAreaInsets();
   const { showAlert } = useAlert();
   const router = useRouter();
+  const { user, profile, signInWithGoogle, logout, authLoading } = useAuth();
 
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState("");
   const [working, setWorking] = useState(false);
+  const [workingMessage, setWorkingMessage] = useState("");
+  const { timeFormat, setTimeFormat } = useSettings();
 
-  const handleClearData = () => {
-    showAlert({
-      type: "warning",
-      title: "Clear All Data",
-      message: "This will permanently delete all sleep records. Continue?",
-      actions: [
-        { text: "Cancel", style: "cancel", onPress: () => {} },
-        {
-          text: "Clear",
-          style: "destructive",
-          onPress: async () => {
-            setWorking(true);
-            await AsyncStorage.multiRemove([
-              "@sleep_entries",
-              "@incomplete_sleep",
-            ]);
-            setWorking(false);
+  const { colors } = useTheme();
 
-            // Use a non‑blocking success toast
-            showAlert({
-              type: "success",
-              title: "Done",
-              message: "All sleep data cleared.",
-              autoDismiss: true,
-            });
-            router.replace("/(tabs)");
-          },
-        },
-      ],
-    });
-  };
-
+  // ---------- Import ----------
   const handleImport = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -99,10 +83,10 @@ export default function ProfileScreen() {
         return;
       }
 
-      // ---- Filter out future dates ----
-      const todayStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      // Filter future dates
+      const todayStr = new Date().toISOString().split("T")[0];
       const pastAndTodayEntries = importedEntries.filter(
-        (entry) => entry.date <= todayStr,
+        (e) => e.date <= todayStr,
       );
       const futureCount = importedEntries.length - pastAndTodayEntries.length;
 
@@ -116,7 +100,6 @@ export default function ProfileScreen() {
         return;
       }
 
-      // ---- Check duplicates ----
       const allEntries = await sleepStorage.getAllEntries();
       const newEntries: Array<Omit<SleepEntry, "id" | "createdAt">> = [];
       const skippedDates: string[] = [];
@@ -153,15 +136,28 @@ export default function ProfileScreen() {
             onPress: async () => {
               setImporting(true);
               let imported = 0;
+              const total = newEntries.length;
+
               for (const entry of newEntries) {
                 try {
-                  await sleepStorage.addManualEntry(entry);
+                  const newEntry = await sleepStorage.addManualEntry(entry);
                   imported++;
+                  setImportProgress(`Imported ${imported} / ${total}…`);
+
+                  if (user) {
+                    try {
+                      await pushEntry(user.uid, newEntry);
+                    } catch (cloudErr) {
+                      console.warn("Cloud push failed:", cloudErr);
+                    }
+                  }
                 } catch (e) {
                   console.warn("Skipping entry:", e);
                 }
               }
+
               setImporting(false);
+              setImportProgress("");
               showAlert({
                 type: "success",
                 title: "Import complete",
@@ -173,16 +169,20 @@ export default function ProfileScreen() {
         ],
       });
     } catch (error: any) {
-      setImporting(false);
+      console.error("Import error:", error);
       showAlert({
         type: "error",
         title: "Import failed",
         message: error.message || "Could not import file.",
         autoDismiss: false,
       });
+    } finally {
+      setImporting(false);
+      setImportProgress("");
     }
   };
 
+  // ---------- Export ----------
   const handleExport = async () => {
     try {
       setWorking(true);
@@ -230,6 +230,7 @@ export default function ProfileScreen() {
         autoDismiss: true,
       });
       setWorking(false);
+      setWorkingMessage("Exporting…");
     }
   };
 
@@ -266,23 +267,172 @@ export default function ProfileScreen() {
       setWorking(false);
     }
   };
+
+  const handleClearData = () => {
+    const message = user
+      ? "This will permanently delete all sleep records (local AND cloud). Continue?"
+      : "This will permanently delete all local sleep records. Continue?";
+
+    showAlert({
+      type: "warning",
+      title: "Clear All Data",
+      message,
+      actions: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            setWorking(true);
+            setWorkingMessage("Clearing data…");
+            try {
+              if (user) {
+                try {
+                  await deleteAllUserEntries(user.uid);
+                } catch (cloudError) {
+                  console.warn(
+                    "Cloud deletion failed (continuing):",
+                    cloudError,
+                  );
+                }
+              }
+              await AsyncStorage.multiRemove([
+                "@sleep_entries",
+                "@incomplete_sleep",
+              ]);
+              showAlert({
+                type: "success",
+                title: "Done",
+                message: "All sleep data cleared.",
+                autoDismiss: true,
+              });
+              router.replace("/(tabs)");
+            } catch (error) {
+              showAlert({
+                type: "error",
+                title: "Error",
+                message: "Could not clear data. Please try again.",
+                autoDismiss: true,
+              });
+            } finally {
+              setWorking(false);
+              setWorkingMessage("");
+            }
+          },
+        },
+      ],
+    });
+  };
+  // ---------- Render ----------
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.background, paddingTop: insets.top },
+      ]}
+    >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.screenTitle}>Profile</Text>
+        <Text style={[styles.screenTitle, { color: colors.foreground }]}>
+          Profile
+        </Text>
+
+        {/* User section */}
+        <View style={styles.userSection}>
+          {authLoading ? (
+            <ActivityIndicator size="large" color={colors.accent} />
+          ) : user && profile ? (
+            <>
+              <Image
+                source={{ uri: profile.photo }}
+                style={[styles.avatar, { borderColor: colors.border }]}
+              />
+              <Text style={[styles.userName, { color: colors.foreground }]}>
+                {profile.name}
+              </Text>
+              <View style={styles.syncRow}>
+                <Ionicons
+                  name="cloud-done-outline"
+                  size={16}
+                  color={colors.mutedForeground}
+                  style={{ opacity: 0.8, marginRight: 6 }}
+                />
+                <Text
+                  style={[styles.syncMessage, { color: colors.textSecondary }]}
+                >
+                  Your sleep data is backed up to the cloud.
+                </Text>
+              </View>
+            </>
+          ) : (
+            <View style={{ alignItems: "center" }}>
+              <TouchableOpacity
+                style={styles.googleButton}
+                onPress={() => signInWithGoogle()}
+              >
+                <Ionicons name="logo-google" size={20} color="#fff" />
+                <Text style={styles.googleButtonText}>Sign in with Google</Text>
+              </TouchableOpacity>
+              <Text style={[styles.syncHint, { color: colors.textSecondary }]}>
+                sign in to back up your data
+              </Text>
+            </View>
+          )}
+        </View>
 
         {/* App Settings */}
-        <Text style={styles.sectionHeader}>App Settings</Text>
-        <View style={styles.settingsCard}>
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>
+          App Settings
+        </Text>
+        <View
+          style={[
+            styles.settingsCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          {/* Time Format Toggle */}
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleLeft}>
+              <View
+                style={[
+                  styles.iconBox,
+                  { backgroundColor: colors.accent + "20" },
+                ]}
+              >
+                <Ionicons name="time-outline" size={18} color={colors.accent} />
+              </View>
+              <Text style={[styles.toggleLabel, { color: colors.foreground }]}>
+                Time Format
+              </Text>
+            </View>
+            <View style={styles.toggleRight}>
+              <Text
+                style={[styles.toggleValue, { color: colors.textSecondary }]}
+              >
+                {timeFormat === "12h" ? "12‑hour" : "24‑hour"}
+              </Text>
+              <Switch
+                value={timeFormat === "24h"}
+                onValueChange={(val) => setTimeFormat(val ? "24h" : "12h")}
+                trackColor={{ false: colors.muted, true: colors.accent }}
+                thumbColor={colors.foreground}
+              />
+            </View>
+          </View>
+          <SettingsRow
+            icon="notifications-outline"
+            label="Notifications"
+            onPress={() => setShowNotifSettings(true)}
+          />
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <SettingsRow
             icon="cloud-download-outline"
             label="Import Data"
             onPress={handleImport}
           />
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <SettingsRow
             icon="share-outline"
             label="Export Data"
@@ -291,8 +441,15 @@ export default function ProfileScreen() {
         </View>
 
         {/* Support */}
-        <Text style={styles.sectionHeader}>Support</Text>
-        <View style={styles.settingsCard}>
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>
+          Support
+        </Text>
+        <View
+          style={[
+            styles.settingsCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
           <SettingsRow
             icon="information-circle-outline"
             label="About"
@@ -305,7 +462,7 @@ export default function ProfileScreen() {
               })
             }
           />
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <SettingsRow
             icon="trash-outline"
             label="Clear All Data"
@@ -313,43 +470,106 @@ export default function ProfileScreen() {
             onPress={handleClearData}
             showArrow={false}
           />
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          {user && (
+            <SettingsRow
+              icon="log-out-outline"
+              label="Sign Out"
+              destructive
+              onPress={async () => {
+                await logout();
+                showAlert({
+                  type: "success",
+                  title: "Logged out",
+                  message: "You have been logged out.",
+                  autoDismiss: true,
+                });
+                router.replace("/(tabs)");
+              }}
+              showArrow={false}
+            />
+          )}
         </View>
 
-        <Text style={styles.versionText}>VERSION 1.0.0</Text>
+        <Text style={[styles.versionText, { color: colors.mutedForeground }]}>
+          VERSION 1.0.0
+        </Text>
       </ScrollView>
 
-      {importing && (
+      {/* Loading overlay */}
+      {(importing || working) && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={Colors.accent} />
-          <Text style={styles.loadingText}>Importing data…</Text>
+          <ActivityIndicator size="large" color={colors.accent} />
+          {importProgress ? (
+            <Text style={[styles.loadingText, { color: colors.foreground }]}>
+              {importProgress}
+            </Text>
+          ) : workingMessage ? (
+            <Text style={[styles.loadingText, { color: colors.foreground }]}>
+              {workingMessage}
+            </Text>
+          ) : (
+            <Text style={[styles.loadingText, { color: colors.foreground }]}>
+              Please wait…
+            </Text>
+          )}
         </View>
       )}
-
-      {working && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={Colors.accent} />
-          <Text style={styles.loadingText}>Please wait…</Text>
-        </View>
-      )}
+      <NotificationSettingsModal
+        visible={showNotifSettings}
+        onClose={() => setShowNotifSettings(false)}
+      />
     </View>
   );
 }
 
+// Base styles – only static properties (flex, padding, fontSize, etc.)
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1 },
   scrollContent: { paddingBottom: 24 },
   screenTitle: {
     fontSize: 28,
     fontWeight: "700",
-    color: Colors.foreground,
     paddingHorizontal: 20,
     marginBottom: 24,
     marginTop: 8,
   },
+  userSection: {
+    alignItems: "center",
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    marginBottom: 12,
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  syncHint: {
+    fontSize: 13,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  googleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#4285F4",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    gap: 8,
+    marginBottom: 8,
+  },
+  googleButtonText: { color: "#fff", fontWeight: "600", fontSize: 15 },
   sectionHeader: {
     fontSize: 12,
     fontWeight: "600",
-    color: Colors.mutedForeground,
     textTransform: "uppercase",
     letterSpacing: 1,
     paddingHorizontal: 20,
@@ -357,17 +577,14 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   settingsCard: {
-    backgroundColor: Colors.card,
     marginHorizontal: 20,
     borderRadius: 16,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: Colors.border,
   },
-  divider: { height: 1, backgroundColor: Colors.border, marginHorizontal: 16 },
+  divider: { height: 1, marginHorizontal: 16 },
   versionText: {
     fontSize: 11,
-    color: Colors.mutedForeground,
     textAlign: "center",
     marginTop: 40,
     marginBottom: 20,
@@ -380,9 +597,47 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 999,
   },
-  loadingText: {
-    color: Colors.foreground,
-    marginTop: 12,
-    fontSize: 16,
+  loadingText: { marginTop: 12, fontSize: 16 },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  toggleLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  toggleLabel: {
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  toggleRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  toggleValue: {
+    fontSize: 14,
+  },
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  syncRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  syncMessage: {
+    fontSize: 13,
+    marginTop: 4,
+    textAlign: "center",
+    opacity: 0.6,
   },
 });

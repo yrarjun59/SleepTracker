@@ -1,5 +1,4 @@
-// components/analytics/TimeFrameSelector.tsx
-import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export type Period = "Week" | "Month" | "Year" | "All";
@@ -12,17 +11,25 @@ interface Props {
 const PERIODS: Period[] = ["Week", "Month", "Year", "All"];
 
 export function TimeFrameSelector({ active, onSelect }: Props) {
+  const { colors } = useTheme();
+
   return (
     <View style={styles.container}>
       {PERIODS.map((p) => (
         <TouchableOpacity
           key={p}
-          style={[styles.pill, active === p && styles.pillActive]}
+          style={[
+            styles.pill,
+            { backgroundColor: active === p ? colors.accent : colors.muted },
+          ]}
           onPress={() => onSelect(p)}
           activeOpacity={0.7}
         >
           <Text
-            style={[styles.pillText, active === p && styles.pillTextActive]}
+            style={[
+              styles.pillText,
+              { color: active === p ? "#FFFFFF" : colors.textSecondary },
+            ]}
           >
             {p}
           </Text>
@@ -31,7 +38,6 @@ export function TimeFrameSelector({ active, onSelect }: Props) {
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -44,17 +50,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 18,
     borderRadius: 20,
-    backgroundColor: Colors.muted,
-  },
-  pillActive: {
-    backgroundColor: Colors.accent,
   },
   pillText: {
     fontSize: 14,
     fontWeight: "500",
-    color: Colors.textSecondary,
-  },
-  pillTextActive: {
-    color: "#FFFFFF",
   },
 });
