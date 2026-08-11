@@ -59,17 +59,15 @@ export function TodaySleepCard({
   const formatTime = useFormattedTime();
 
   useEffect(() => {
-    (async () => {
-      const q = await getTodayQuote();
-      setQuote(q);
-    })();
+    const q = getTodayQuote();
+    setQuote(q);
   }, []);
 
-  // derive awake duration from last completed entry
   let hoursAwake: number | null = null;
   if (lastCompletedEntry?.wakeTime) {
     const lastWake = parseLocalDateTime(lastCompletedEntry.wakeTime);
-    hoursAwake = (Date.now() - lastWake.getTime()) / (1000 * 60 * 60);
+    const raw = (Date.now() - lastWake.getTime()) / (1000 * 60 * 60);
+    hoursAwake = Math.max(0, raw); // never show negative
   }
 
   const isNap =
@@ -82,10 +80,14 @@ export function TodaySleepCard({
         ? "TODAY'S NAP"
         : "TODAY'S SLEEP";
 
-  // always visible quote section
   const quoteSection = (
     <View style={styles.quoteBlock}>
-      <Text style={[styles.quoteText, { color: colors.foreground }]}>
+      <Text
+        style={[styles.quoteText, { color: colors.foreground }]}
+        numberOfLines={3}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+      >
         “{quote.text}”
       </Text>
       <Text style={[styles.quoteAuthor, { color: colors.textSecondary }]}>
@@ -117,22 +119,29 @@ export function TodaySleepCard({
         " " +
         formatTime(d);
 
-      const detailsLine = (
-        <Text style={[styles.lastSleepDetail, { color: colors.textSecondary }]}>
-          {fmt(lastSleep)} – {fmt(lastWake)}
-        </Text>
-      );
-
       if (hoursAwake < 18) {
         return (
           <View style={[styles.recentSleep, { borderTopColor: colors.border }]}>
-            <Text style={{ fontSize: 14, marginRight: 4 }}>☀️</Text>
-            <Text
-              style={[styles.recentSleepText, { color: colors.textSecondary }]}
-            >
-              wake since {getShortRelativeTime(hoursAwake)}
-            </Text>
-            {detailsLine}
+            <View style={styles.wakeSinceRow}>
+              <Text style={{ fontSize: 14, marginRight: 4 }}>☀️</Text>
+              <Text
+                style={[
+                  styles.recentSleepText,
+                  { color: colors.textSecondary },
+                ]}
+                numberOfLines={1}
+              >
+                wake since {getShortRelativeTime(hoursAwake)}
+              </Text>
+              <Text
+                style={[
+                  styles.lastSleepDetail,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                {fmt(lastSleep)} – {fmt(lastWake)}
+              </Text>
+            </View>
           </View>
         );
       } else {
@@ -168,7 +177,6 @@ export function TodaySleepCard({
   );
 }
 
-// Base styles (static properties only)
 const styles = StyleSheet.create({
   card: {
     marginHorizontal: 20,
@@ -200,14 +208,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   recentSleep: {
-    flexDirection: "row",
-    alignItems: "center",
     marginTop: 16,
     paddingTop: 12,
     borderTopWidth: 1,
   },
   recentSleepText: {
-    fontSize: 13,
+    fontSize: 12,
     flex: 1,
   },
   reminder: {
@@ -218,13 +224,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   reminderText: {
-    fontSize: 13,
-    flex: 1,
-  },
-  lastSleepDetail: {
     fontSize: 12,
-    marginTop: 4,
-    textAlign: "center",
+    flex: 1,
   },
   quoteBlock: {
     alignItems: "center",
@@ -239,5 +240,13 @@ const styles = StyleSheet.create({
   quoteAuthor: {
     fontSize: 13,
     marginTop: 6,
+  },
+  wakeSinceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  lastSleepDetail: {
+    fontSize: 12,
   },
 });

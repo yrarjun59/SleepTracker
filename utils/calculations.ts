@@ -11,8 +11,7 @@ export function calculateDuration(sleepTime: string, wakeTime: string): number {
 export function getWeeklyAverage(
   entries: SleepEntry[],
   weekOffset = 0,
-  minDays = 6, // 👈 new parameter
-): number | null {
+): number {
   const now = new Date();
   const endDate = new Date(now);
   endDate.setDate(now.getDate() + weekOffset * 7);
@@ -25,12 +24,8 @@ export function getWeeklyAverage(
     return d >= startDate && d < endDate;
   });
 
-  // Require a minimum number of distinct days with sleep
-  const uniqueDays = new Set(weekEntries.map((e) => e.date)).size;
-  if (uniqueDays < minDays) return null;
-
   const total = weekEntries.reduce((sum, e) => sum + (e.duration || 0), 0);
-  return Math.round((total / 7) * 10) / 10; // still average over 7 days
+  return Math.round((total / 7) * 10) / 10; 
 }
 
 export function getDifferenceInMinutes(

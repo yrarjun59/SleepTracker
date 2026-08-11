@@ -75,7 +75,12 @@ export function CustomAlert({
         if (!autoDismiss) onClose?.();
       }}
     >
-      <View style={styles.overlay}>
+      <View
+        style={[
+          styles.overlay,
+          type === "confirm" && { justifyContent: "center" },
+        ]}
+      >
         <Animated.View
           style={[
             styles.container,
@@ -84,6 +89,7 @@ export function CustomAlert({
               backgroundColor: colors.card,
               borderColor: colors.border,
             },
+            type === "confirm" && { marginTop: 0 },
           ]}
         >
           <View style={[styles.iconCircle, { backgroundColor: accentColor }]}>

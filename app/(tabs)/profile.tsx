@@ -1,24 +1,18 @@
-// app/(tabs)/profile.tsx
 import { NotificationSettingsModal } from "@/components/profile/NotificationSettingsModal";
 import { SettingsRow } from "@/components/profile/SettingsRow";
 import { useAlert } from "@/contexts/AlertContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { deleteAllUserEntries, pushEntry } from "@/services/cloudStorage";
-import * as sleepStorage from "@/services/sleepStorage";
-import { SleepEntry } from "@/types/sleep";
-import { entriesToCSV, parseCSV } from "@/utils/csvHelper";
+import { useSleepEntries } from "@/hooks/useSleepEntries";
+import { deleteAllUserEntries } from "@/services/cloudStorage";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -27,6 +21,14 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { pushEntry } from "@/services/cloudStorage";
+import * as sleepStorage from "@/services/sleepStorage";
+import { SleepEntry } from "@/types/sleep";
+import { parseCSV } from "@/utils/csvHelper";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
+import { Platform } from "react-native";
 
 export default function ProfileScreen() {
   const [showNotifSettings, setShowNotifSettings] = useState(false);
@@ -42,8 +44,9 @@ export default function ProfileScreen() {
   const { timeFormat, setTimeFormat } = useSettings();
 
   const { colors } = useTheme();
+  const { refresh } = useSleepEntries();
 
-  // ---------- Import ----------
+  // ---------- Import & Export ----------
   const handleImport = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -182,91 +185,91 @@ export default function ProfileScreen() {
     }
   };
 
-  // ---------- Export ----------
-  const handleExport = async () => {
-    try {
-      setWorking(true);
-      const allEntries = await sleepStorage.getAllEntries();
-      if (allEntries.length === 0) {
-        showAlert({
-          type: "info",
-          title: "No data",
-          message: "There are no sleep entries to export.",
-          autoDismiss: true,
-        });
-        setWorking(false);
-        return;
-      }
+  // // ---------- Export ----------
+  // const handleExport = async () => {
+  //   try {
+  //     setWorking(true);
+  //     const allEntries = await sleepStorage.getAllEntries();
+  //     if (allEntries.length === 0) {
+  //       showAlert({
+  //         type: "info",
+  //         title: "No data",
+  //         message: "There are no sleep entries to export.",
+  //         autoDismiss: true,
+  //       });
+  //       setWorking(false);
+  //       return;
+  //     }
 
-      if (allEntries.length < 7) {
-        showAlert({
-          type: "confirm",
-          title: "Just a few entries",
-          message: `You only have ${allEntries.length} sleep entries. The file will be small. Export anyway?`,
-          actions: [
-            {
-              text: "Cancel",
-              style: "cancel",
-              onPress: () => setWorking(false),
-            },
-            {
-              text: "Export",
-              onPress: async () => {
-                await performExport(allEntries);
-              },
-            },
-          ],
-        });
-        return;
-      }
+  //     if (allEntries.length < 7) {
+  //       showAlert({
+  //         type: "confirm",
+  //         title: "Just a few entries",
+  //         message: `You only have ${allEntries.length} sleep entries. The file will be small. Export anyway?`,
+  //         actions: [
+  //           {
+  //             text: "Cancel",
+  //             style: "cancel",
+  //             onPress: () => setWorking(false),
+  //           },
+  //           {
+  //             text: "Export",
+  //             onPress: async () => {
+  //               await performExport(allEntries);
+  //             },
+  //           },
+  //         ],
+  //       });
+  //       return;
+  //     }
 
-      await performExport(allEntries);
-    } catch (error) {
-      console.error("❌ Export failed:", error);
-      showAlert({
-        type: "error",
-        title: "Export failed",
-        message: "Could not export data. Please try again.",
-        autoDismiss: true,
-      });
-      setWorking(false);
-      setWorkingMessage("Exporting…");
-    }
-  };
+  //     await performExport(allEntries);
+  //   } catch (error) {
+  //     console.error("❌ Export failed:", error);
+  //     showAlert({
+  //       type: "error",
+  //       title: "Export failed",
+  //       message: "Could not export data. Please try again.",
+  //       autoDismiss: true,
+  //     });
+  //     setWorking(false);
+  //     setWorkingMessage("Exporting…");
+  //   }
+  // };
 
-  const performExport = async (entries: SleepEntry[]) => {
-    try {
-      const csv = entriesToCSV(entries);
-      const today = new Date().toISOString().split("T")[0];
-      const fileName = `${today}-sleepdata.csv`;
-      const localPath = FileSystem.documentDirectory + fileName;
+  // const performExport = async (entries: SleepEntry[]) => {
+  //   try {
+  //     const csv = entriesToCSV(entries);
+  //     const today = new Date().toISOString().split("T")[0];
+  //     const fileName = `${today}-sleepdata.csv`;
+  //     const localPath = FileSystem.documentDirectory + fileName;
 
-      await FileSystem.writeAsStringAsync(localPath, csv, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
+  //     await FileSystem.writeAsStringAsync(localPath, csv, {
+  //       encoding: FileSystem.EncodingType.UTF8,
+  //     });
 
-      console.log("✅ Export successful");
-      console.log("   File name:", fileName);
-      console.log("   Full path:", localPath);
+  //     console.log("✅ Export successful");
+  //     console.log("   File name:", fileName);
+  //     console.log("   Full path:", localPath);
 
-      showAlert({
-        type: "success",
-        title: "Saved",
-        message: `Saved as ${fileName}`,
-        autoDismiss: true,
-      });
-    } catch (error) {
-      console.error("❌ Export failed:", error);
-      showAlert({
-        type: "error",
-        title: "Export failed",
-        message: "Could not export data. Please try again.",
-        autoDismiss: true,
-      });
-    } finally {
-      setWorking(false);
-    }
-  };
+  //     showAlert({
+  //       type: "success",
+  //       title: "Saved",
+  //       message: `Saved as ${fileName}`,
+  //       autoDismiss: true,
+  //     });
+  //   } catch (error) {
+  //     console.error("❌ Export failed:", error);
+  //     showAlert({
+  //       type: "error",
+  //       title: "Export failed",
+  //       message: "Could not export data. Please try again.",
+  //       autoDismiss: true,
+  //     });
+  //   } finally {
+  //     setWorking(false);
+  //   }
+  // };
 
   const handleClearData = () => {
     const message = user
@@ -284,8 +287,8 @@ export default function ProfileScreen() {
           style: "destructive",
           onPress: async () => {
             setWorking(true);
-            setWorkingMessage("Clearing data…");
             try {
+              // 1. Delete cloud entries if logged in
               if (user) {
                 try {
                   await deleteAllUserEntries(user.uid);
@@ -296,14 +299,21 @@ export default function ProfileScreen() {
                   );
                 }
               }
+
+              // 2. Clear local storage
               await AsyncStorage.multiRemove([
                 "@sleep_entries",
                 "@incomplete_sleep",
               ]);
+
+              // 3. Refresh the data in memory (so UI goes to empty state)
+              refresh();
+
+              // 4. Show success and navigate to Home
               showAlert({
                 type: "success",
                 title: "Done",
-                message: "All sleep data cleared.",
+                message: "All data cleared.",
                 autoDismiss: true,
               });
               router.replace("/(tabs)");
@@ -316,14 +326,13 @@ export default function ProfileScreen() {
               });
             } finally {
               setWorking(false);
-              setWorkingMessage("");
             }
           },
         },
       ],
     });
   };
-  // ---------- Render ----------
+
   return (
     <View
       style={[
@@ -433,11 +442,11 @@ export default function ProfileScreen() {
             onPress={handleImport}
           />
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <SettingsRow
+          {/* <SettingsRow
             icon="share-outline"
             label="Export Data"
             onPress={handleExport}
-          />
+          /> */}
         </View>
 
         {/* Support */}
@@ -523,7 +532,6 @@ export default function ProfileScreen() {
   );
 }
 
-// Base styles – only static properties (flex, padding, fontSize, etc.)
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { paddingBottom: 24 },

@@ -1,3 +1,4 @@
+import { auth } from "@/firebaseConfig"; 
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import {
   GoogleAuthProvider,
@@ -6,7 +7,6 @@ import {
   User,
 } from "firebase/auth";
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { auth } from "../firebaseConfig";
 
 interface AuthContextType {
   user: User | null;

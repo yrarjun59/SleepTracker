@@ -1,4 +1,4 @@
-// app/_layout.tsx
+
 import { AlertProvider } from "@/contexts/AlertContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
@@ -8,6 +8,7 @@ import {
   startQuoteRefresher,
   stopQuoteRefresher,
 } from "@/services/quoteService";
+import * as Notifications from "expo-notifications";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -37,6 +38,15 @@ function AppContent() {
 
 // 2) RootLayout – only provides the context wrappers
 export default function RootLayout() {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
   return (
     <ThemeProvider>
       <AuthProvider>

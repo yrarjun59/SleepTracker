@@ -1,11 +1,12 @@
+// components/home/WeeklyComparisonCard.tsx
 import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 
 interface WeeklyComparisonCardProps {
-  thisWeek: number | null;
-  lastWeek: number | null;
-  differenceMinutes: number | null;
+  thisWeek: number;
+  lastWeek: number;
+  differenceMinutes: number;
 }
 
 function formatDifference(minutes: number): string {
@@ -23,11 +24,8 @@ export function WeeklyComparisonCard({
   lastWeek,
   differenceMinutes,
 }: WeeklyComparisonCardProps) {
-  const hasBothWeeks =
-    thisWeek !== null && lastWeek !== null && differenceMinutes !== null;
-  const isBetter = hasBothWeeks ? differenceMinutes >= 0 : false;
-
   const { colors } = useTheme();
+  const isBetter = differenceMinutes >= 0;
 
   return (
     <View style={[styles.card, { backgroundColor: colors.muted }]}>
@@ -41,7 +39,7 @@ export function WeeklyComparisonCard({
             This week:
           </Text>
           <Text style={[styles.statValue, { color: colors.foreground }]}>
-            {thisWeek !== null ? `${thisWeek.toFixed(1)} hrs` : "— hrs"}
+            {thisWeek.toFixed(1)} hrs
           </Text>
         </View>
         <View style={styles.statRow}>
@@ -49,56 +47,34 @@ export function WeeklyComparisonCard({
             Last week:
           </Text>
           <Text style={[styles.statValue, { color: colors.foreground }]}>
-            {lastWeek !== null ? `${lastWeek.toFixed(1)} hrs` : "— hrs"}
+            {lastWeek.toFixed(1)} hrs
           </Text>
         </View>
       </View>
 
-      {hasBothWeeks ? (
-        <View
-          style={[styles.badge, isBetter ? styles.badgeGood : styles.badgeBad]}
+      <View
+        style={[styles.badge, isBetter ? styles.badgeGood : styles.badgeBad]}
+      >
+        <Ionicons
+          name={isBetter ? "arrow-up" : "arrow-down"}
+          size={16}
+          color={isBetter ? colors.accent : colors.destructive}
+        />
+        <Text
+          style={[
+            styles.badgeText,
+            { color: isBetter ? colors.accent : colors.destructive },
+          ]}
         >
-          <Ionicons
-            name={isBetter ? "arrow-up" : "arrow-down"}
-            size={16}
-            color={isBetter ? colors.accent : colors.destructive}
-          />
-          <Text
-            style={[
-              styles.badgeText,
-              { color: isBetter ? colors.accent : colors.destructive },
-            ]}
-          >
-            {isBetter ? "+" : "−"}
-            {formatDifference(differenceMinutes)}{" "}
-            {isBetter ? "better" : "worse"}
-          </Text>
-        </View>
-      ) : (
-        <View style={[styles.badgeNeutral, { backgroundColor: colors.muted }]}>
-          <Text
-            style={[styles.badgeNeutralText, { color: colors.mutedForeground }]}
-          >
-            Not enough data to compare
-          </Text>
-        </View>
-      )}
+          {isBetter ? "+" : "−"}
+          {formatDifference(differenceMinutes)} {isBetter ? "better" : "worse"}
+        </Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  badgeNeutral: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  badgeNeutralText: {
-    fontSize: 14,
-  },
   card: {
     marginHorizontal: 20,
     borderRadius: 16,

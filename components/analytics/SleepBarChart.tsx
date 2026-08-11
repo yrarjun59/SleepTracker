@@ -1,7 +1,7 @@
 import { useTheme } from "@/contexts/ThemeContext";
 import { DayData } from "@/utils/analyticsHelpers";
 import { getSleepQuality, SLEEP_QUALITY_COLORS } from "@/utils/sleepQuality";
-import { StyleSheet, Text, View } from "react-native";
+import { Dimensions, StyleSheet, Text, View } from "react-native";
 
 interface SleepBarChartProps {
   data: DayData[];
@@ -10,12 +10,33 @@ interface SleepBarChartProps {
   idealHoursPerDay?: number;
 }
 
+// Card margins/padding are hardcoded to match the chart card style in analytics.tsx
+const CARD_MARGIN_HORIZONTAL = 20; // from chartCard style
+const CARD_PADDING = 20; // from chartCard style
+const MAX_BAR_WIDTH = 45;
+const GAP_BETWEEN_BARS = 10;
+
 export function SleepBarChart({
   data,
   width,
   idealHoursPerDay = 8,
 }: SleepBarChartProps) {
   const { colors } = useTheme();
+
+  
+  const screenWidth = Dimensions.get("window").width;
+  const containerWidth =
+    width ?? screenWidth - 2 * CARD_MARGIN_HORIZONTAL - 2 * CARD_PADDING;
+
+  // Compute per‑bar width after subtracting gaps
+  const gapCount = data.length - 1;
+  const totalGaps = gapCount * GAP_BETWEEN_BARS;
+  const availableWidth = containerWidth - totalGaps;
+  const barWidth = data.length > 0 ? availableWidth / data.length : 0;
+  const effectiveWidth = Math.min(barWidth, MAX_BAR_WIDTH);
+
+  // Dynamic radius: 30% of bar width, clamped between 2 and 15
+  const dynamicRadius = Math.max(2, Math.min(effectiveWidth * 0.4, 15));
 
   if (data.length === 0) {
     return (
@@ -38,11 +59,29 @@ export function SleepBarChart({
 
         return (
           <View key={index} style={styles.barWrapper}>
-            <View style={[styles.bar, { backgroundColor: colors.muted }]}>
+            {/* Track with explicit width */}
+            <View
+              style={[
+                styles.bar,
+                {
+                  width: effectiveWidth,
+                  maxWidth: MAX_BAR_WIDTH,
+                  backgroundColor: colors.muted,
+                  borderTopLeftRadius: dynamicRadius,
+                  borderTopRightRadius: dynamicRadius,
+                },
+              ]}
+            >
+              {/* Fill – same width and radius */}
               <View
                 style={[
                   styles.barFill,
-                  { height: `${percent}%`, backgroundColor: barColor },
+                  {
+                    height: `${percent}%`,
+                    backgroundColor: barColor,
+                    borderTopLeftRadius: dynamicRadius,
+                    borderTopRightRadius: dynamicRadius,
+                  },
                 ]}
               />
             </View>
@@ -79,21 +118,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     height: 180,
     paddingTop: 8,
-    gap: 6,
+    gap: GAP_BETWEEN_BARS,
   },
   barWrapper: {
     alignItems: "center",
     justifyContent: "flex-end",
-    flex: 1,
   },
   bar: {
-    width: "90%",
-    maxWidth: 45,
     height: "100%",
     justifyContent: "flex-end",
     overflow: "hidden",
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
   },
   barFill: {
     width: "100%",

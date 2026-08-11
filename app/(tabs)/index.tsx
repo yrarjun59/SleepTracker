@@ -19,7 +19,7 @@ import { RecordButton } from "@/components/home/RecordButton";
 import { SecondaryActions } from "@/components/home/SecondaryActions";
 import { TodaySleepCard } from "@/components/home/TodaySleepCard";
 import { WeeklyComparisonCard } from "@/components/home/WeeklyComparisonCard";
-
+import { useAlert } from "@/contexts/AlertContext";
 import { useSleepEntries } from "@/hooks/useSleepEntries";
 import { useWeeklyStats } from "@/hooks/useWeeklyStats";
 import {
@@ -49,7 +49,7 @@ export default function HomeScreen() {
     abortSleep,
     refresh,
   } = useSleepEntries();
-
+  const { showAlert } = useAlert();
   const { thisWeek, lastWeek, differenceMinutes } = useWeeklyStats(entries);
 
   const [elapsedLabel, setElapsedLabel] = useState("0m");
@@ -58,13 +58,13 @@ export default function HomeScreen() {
 
   const isSleeping = !!incomplete;
 
-  const { prefs } = useNotifications();
-  const [showOnboarding, setShowOnboarding] = useState(!prefs.setupComplete);
+  const { prefs,  loading: prefsLoading } = useNotifications();
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const navigation = useNavigation();
   const pathname = usePathname();
 
-  const { colors } = useTheme(); // 👈 theme hook
+  const { colors } = useTheme();
 
   // live timer for sleep
   useEffect(() => {
@@ -141,26 +141,50 @@ export default function HomeScreen() {
     }
   }, [pathname, refresh]);
 
+  useEffect(() => {
+    if (prefs.setupComplete === false) {
+      setShowOnboarding(true);
+    }
+  }, [prefsLoading, prefs.setupComplete]);
+
   // ---------- Handlers ----------
   const handleRecord = async () => {
+    console.log("🎯 Haptic: medium impact");
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await startSleep();
   };
 
   const handleHoldComplete = async () => {
     const minutes = getElapsedMinutes(incomplete!.sleepTime);
+
+    if (minutes < 10) {
+      // Warn before discarding
+      showAlert({
+        type: "confirm",
+        title: "Too short",
+        message: `Your sleep was only ${minutes} minute${minutes !== 1 ? "s" : ""}. It won't be recorded. Wake up anyway?`,
+        actions: [
+          { text: "Keep sleeping", style: "cancel", onPress: () => {} },
+          {
+            text: "Wake up",
+            style: "destructive",
+            onPress: async () => {
+              await abortSleep();
+              await Haptics.notificationAsync(
+                Haptics.NotificationFeedbackType.Warning,
+              );
+            },
+          },
+        ],
+      });
+      return;
+    }
+
+    // 10 minutes or more – save normally
     try {
-      if (minutes >= 10) {
-        await finishSleep();
-        await Haptics.notificationAsync(
-          Haptics.NotificationFeedbackType.Success,
-        );
-      } else {
-        await abortSleep();
-        await Haptics.notificationAsync(
-          Haptics.NotificationFeedbackType.Warning,
-        );
-      }
+      console.log("🎯 Haptic: success / warning");
+      await finishSleep();
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
       await abortSleep();
     }

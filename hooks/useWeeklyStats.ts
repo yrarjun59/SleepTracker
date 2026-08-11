@@ -7,10 +7,12 @@ export function useWeeklyStats(entries: SleepEntry[]) {
     const thisWeek = getWeeklyAverage(entries, 0);
     const lastWeek = getWeeklyAverage(entries, -1);
 
-    const differenceMinutes =
-      thisWeek !== null && lastWeek !== null
-        ? getDifferenceInMinutes(thisWeek, lastWeek)
-        : null;
+    // const differenceMinutes =
+    //   thisWeek !== null && lastWeek !== null
+    //     ? getDifferenceInMinutes(thisWeek, lastWeek)
+    //     : null;
+
+    const differenceMinutes = getDifferenceInMinutes(thisWeek, lastWeek);
 
     return {
       thisWeek, // number | null
