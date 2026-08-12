@@ -47,3 +47,5 @@ yarn-error.*
 .vscode/
 eas.json
 app.json
+
+/google-services.json/
