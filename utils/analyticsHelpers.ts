@@ -405,3 +405,85 @@ export function getMonthlyStats(data: DayData[]): MonthlyStats {
     monthsTracked: monthsWithSleep.length,
   };
 }
+
+export interface SleepTimePoint {
+  date: string; // "Mon", "Jan 2026", etc.
+  fullDate: string; // "2026-08-14" or "Jan 2026"
+  bedtime: number | null; // minutes from midnight (0‑1439)
+  wakeTime: number | null;
+}
+
+// Helper to convert Date to minutes from midnight
+function toMinutes(date: Date): number {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+// Computes daily bedtime/wake‑up points for last N days
+export function getDailySleepTimes(
+  entries: SleepEntry[],
+  days: number,
+): SleepTimePoint[] {
+  const result: SleepTimePoint[] = [];
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    const dateStr = d.toISOString().split("T")[0];
+    const dayLabel = d.toLocaleDateString("en-US", { weekday: "short" });
+
+    // Find the longest sleep entry for this date (primary sleep)
+    const entriesForDate = entries.filter(
+      (e) => e.date === dateStr && e.wakeTime,
+    );
+    let bedtime: number | null = null;
+    let wakeTime: number | null = null;
+    if (entriesForDate.length > 0) {
+      const primary = entriesForDate.reduce((max, e) =>
+        (e.duration ?? 0) > (max.duration ?? 0) ? e : max,
+      );
+      bedtime = toMinutes(new Date(primary.sleepTime));
+      wakeTime = toMinutes(new Date(primary.wakeTime!));
+    }
+    result.push({ date: dayLabel, fullDate: dateStr, bedtime, wakeTime });
+  }
+  return result;
+}
+
+// Computes monthly average bedtime/wake‑up for last N months
+export function getMonthlySleepTimes(
+  entries: SleepEntry[],
+  monthsBack: number,
+): SleepTimePoint[] {
+  const result: SleepTimePoint[] = [];
+  const now = new Date();
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthEntries = entries.filter((e) => {
+      const date = new Date(e.date);
+      return (
+        date.getFullYear() === d.getFullYear() &&
+        date.getMonth() === d.getMonth()
+      );
+    });
+    let bedSum = 0,
+      wakeSum = 0,
+      count = 0;
+    for (const entry of monthEntries) {
+      if (!entry.wakeTime) continue;
+      bedSum += toMinutes(new Date(entry.sleepTime));
+      wakeSum += toMinutes(new Date(entry.wakeTime));
+      count++;
+    }
+    const label = d.toLocaleDateString("en-US", {
+      month: "short",
+      year: "numeric",
+    });
+    result.push({
+      date: label,
+      fullDate: label,
+      bedtime: count > 0 ? Math.round(bedSum / count) : null,
+      wakeTime: count > 0 ? Math.round(wakeSum / count) : null,
+    });
+  }
+  return result;
+}

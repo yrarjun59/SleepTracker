@@ -1,4 +1,3 @@
-
 import { AlertProvider } from "@/contexts/AlertContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
@@ -40,11 +39,10 @@ function AppContent() {
 export default function RootLayout() {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
       shouldShowBanner: true,
       shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
     }),
   });
   return (

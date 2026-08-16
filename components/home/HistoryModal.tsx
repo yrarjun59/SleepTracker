@@ -1,9 +1,11 @@
 // components/home/HistoryModal.tsx
+import { useAlert } from "@/contexts/AlertContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { SleepEntry } from "@/types/sleep";
 import { getMonthlySummary } from "@/utils/analyticsHelpers";
 import { useFormattedTime } from "@/utils/formatTime";
 import { useMemo, useState } from "react";
+
 import {
   FlatList,
   Modal,
@@ -47,6 +49,7 @@ export function HistoryModal({ visible, onClose, entries }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("7d");
   const { colors } = useTheme();
   const formatTime = useFormattedTime();
+  const { showAlert } = useAlert();
 
   const { individualEntries, monthlySummary } = useMemo(() => {
     const now = new Date();
@@ -206,11 +209,14 @@ export function HistoryModal({ visible, onClose, entries }: Props) {
                   style={[styles.item, { borderBottomColor: colors.border }]}
                 >
                   <View style={styles.leftBlock}>
-                    <Text
-                      style={[styles.itemText, { color: colors.foreground }]}
-                    >
-                      {formatEntry(item)}
-                    </Text>
+                    <View style={styles.firstLine}>
+                      <Text
+                        style={[styles.itemText, { color: colors.foreground }]}
+                        numberOfLines={1}
+                      >
+                        {formatEntry(item)}
+                      </Text>
+                    </View>
                     <Text
                       style={[
                         styles.duration,
@@ -298,9 +304,14 @@ const styles = StyleSheet.create({
   leftBlock: {
     flex: 1,
   },
+  firstLine: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   itemText: {
     fontSize: 15,
     fontWeight: "500",
+    flex: 1,
   },
   duration: {
     fontSize: 13,

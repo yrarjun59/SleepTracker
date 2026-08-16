@@ -1,4 +1,5 @@
 // components/onboarding/FirstTimeSetup.tsx
+import { useAlert } from "@/contexts/AlertContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -25,9 +26,13 @@ interface Props {
 export function FirstTimeSetup({ visible, onDismiss }: Props) {
   const { colors } = useTheme();
   const { prefs, updatePrefs, requestPermission } = useNotifications();
+  const { showAlert } = useAlert();
   const formatTime = useFormattedTime();
   const { timeFormat } = useSettings();
   const is24Hour = timeFormat === "24h";
+
+  // Track whether user set custom times or left defaults
+  const [hasCustomTimes, setHasCustomTimes] = useState(false);
 
   // Convert stored "HH:MM" to Date objects
   const initialBedtime = new Date();
@@ -44,9 +49,8 @@ export function FirstTimeSetup({ visible, onDismiss }: Props) {
     null,
   );
 
-  const isPickerOpen = useRef(false); // prevent double-open on Android
+  const isPickerOpen = useRef(false);
 
-  // Step management
   const [step, setStep] = useState(0);
   const totalSteps = 3;
 
@@ -69,11 +73,25 @@ export function FirstTimeSetup({ visible, onDismiss }: Props) {
       wakeupTime: wakeup,
       quoteNotifications: true,
       setupComplete: true,
+      bedtimeReminderEnabled: true,
+      wakeupReminderEnabled: true,
     });
+    const bedtimeStr = formatTime(bedtimeDate);
+    const wakeupStr = formatTime(wakeupDate);
+
+    showAlert({
+      type: "success",
+      title: "Sleep Times Set",
+      message: hasCustomTimes
+        ? `Your usual sleep times have been saved.\nBedtime: ${bedtimeStr}\nWake-up: ${wakeupStr}`
+        : `Using default sleep times.\nBedtime: ${bedtimeStr}\nWake-up: ${wakeupStr}`,
+      autoDismiss: true,
+    });
+
     onDismiss();
   };
 
-  // ----- Android picker effect (replaces the old IIFE) -----
+  // Android picker effect
   useEffect(() => {
     if (pickerTarget === null || Platform.OS !== "android") return;
     if (isPickerOpen.current) return;
@@ -90,6 +108,7 @@ export function FirstTimeSetup({ visible, onDismiss }: Props) {
         if (event.type === "set" && date) {
           if (pickerTarget === "bedtime") setBedtimeDate(date);
           else if (pickerTarget === "wakeup") setWakeupDate(date);
+          setHasCustomTimes(true);
         }
         setPickerTarget(null);
       },
@@ -143,11 +162,11 @@ export function FirstTimeSetup({ visible, onDismiss }: Props) {
         return (
           <>
             <Text style={[styles.title, { color: colors.foreground }]}>
-              Set your usual sleep times
+              Set your usual sleep times (optional)
             </Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              We'll send you a reminder when it's time for bed and when you
-              should wake up.
+              We'll use these as your default reminders. You can change them
+              anytime.
             </Text>
 
             <Text style={[styles.label, { color: colors.foreground }]}>
@@ -185,7 +204,8 @@ export function FirstTimeSetup({ visible, onDismiss }: Props) {
             </TouchableOpacity>
 
             <Text style={[styles.info, { color: colors.mutedForeground }]}>
-              You can change these anytime in Settings → Notifications.
+              You'll get a bedtime reminder at {formatTime(bedtimeDate)} and a
+              wake‑up reminder at {formatTime(wakeupDate)}.
             </Text>
           </>
         );
@@ -221,7 +241,7 @@ export function FirstTimeSetup({ visible, onDismiss }: Props) {
             </ScrollView>
 
             <View style={styles.navRow}>
-              {step > 0 && (
+              {step > 0 && step < totalSteps - 1 && (
                 <TouchableOpacity
                   style={[styles.navButton, { borderColor: colors.border }]}
                   onPress={() => setStep(step - 1)}
@@ -242,7 +262,7 @@ export function FirstTimeSetup({ visible, onDismiss }: Props) {
         </View>
       </View>
 
-      {/* iOS picker – unchanged */}
+      {/* iOS picker */}
       {pickerTarget !== null && Platform.OS === "ios" && (
         <DateTimePicker
           value={pickerTarget === "bedtime" ? bedtimeDate : wakeupDate}
@@ -253,6 +273,7 @@ export function FirstTimeSetup({ visible, onDismiss }: Props) {
             if (date) {
               if (pickerTarget === "bedtime") setBedtimeDate(date);
               else if (pickerTarget === "wakeup") setWakeupDate(date);
+              setHasCustomTimes(true);
             }
             setPickerTarget(null);
           }}

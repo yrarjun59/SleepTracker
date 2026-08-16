@@ -58,7 +58,7 @@ export default function HomeScreen() {
 
   const isSleeping = !!incomplete;
 
-  const { prefs,  loading: prefsLoading } = useNotifications();
+  const { prefs, loading: prefsLoading } = useNotifications();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const navigation = useNavigation();
@@ -142,14 +142,13 @@ export default function HomeScreen() {
   }, [pathname, refresh]);
 
   useEffect(() => {
-    if (prefs.setupComplete === false) {
+    if (!prefsLoading && prefs.setupComplete === false) {
       setShowOnboarding(true);
     }
   }, [prefsLoading, prefs.setupComplete]);
 
   // ---------- Handlers ----------
   const handleRecord = async () => {
-    console.log("🎯 Haptic: medium impact");
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await startSleep();
   };
@@ -158,7 +157,6 @@ export default function HomeScreen() {
     const minutes = getElapsedMinutes(incomplete!.sleepTime);
 
     if (minutes < 10) {
-      // Warn before discarding
       showAlert({
         type: "confirm",
         title: "Too short",
@@ -182,9 +180,8 @@ export default function HomeScreen() {
 
     // 10 minutes or more – save normally
     try {
-      console.log("🎯 Haptic: success / warning");
       await finishSleep();
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
       await abortSleep();
     }
@@ -301,6 +298,7 @@ export default function HomeScreen() {
         visible={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
         entries={entries}
+       
       />
 
       <FirstTimeSetup

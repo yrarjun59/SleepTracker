@@ -1,4 +1,6 @@
+// components/home/HoldToRecordButton.tsx
 import { useTheme } from "@/contexts/ThemeContext";
+import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -11,6 +13,7 @@ export function HoldToRecordButton({ onComplete }: Props) {
   const progress = useRef(new Animated.Value(0)).current;
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressAnim = useRef<Animated.CompositeAnimation | null>(null);
+  const hapticInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasFired = useRef(false);
 
   const { colors } = useTheme();
@@ -18,6 +21,12 @@ export function HoldToRecordButton({ onComplete }: Props) {
   const startHold = () => {
     hasFired.current = false;
     setHolding(true);
+
+    // Continuous haptic while holding (every 500ms)
+    hapticInterval.current = setInterval(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }, 500);
+
     progress.setValue(0);
 
     progressAnim.current = Animated.timing(progress, {
@@ -27,6 +36,7 @@ export function HoldToRecordButton({ onComplete }: Props) {
     });
     progressAnim.current.start();
 
+    // Hold for 3 seconds, then complete
     holdTimer.current = setTimeout(() => {
       hasFired.current = true;
       onComplete();
@@ -40,6 +50,7 @@ export function HoldToRecordButton({ onComplete }: Props) {
   };
 
   const reset = () => {
+    // Clear all timers and animations
     if (holdTimer.current) {
       clearTimeout(holdTimer.current);
       holdTimer.current = null;
@@ -48,18 +59,23 @@ export function HoldToRecordButton({ onComplete }: Props) {
       progressAnim.current.stop();
       progressAnim.current = null;
     }
+    if (hapticInterval.current) {
+      clearInterval(hapticInterval.current);
+      hapticInterval.current = null;
+    }
     setHolding(false);
     progress.setValue(0);
   };
 
   useEffect(() => {
     return () => {
+      // Cleanup on unmount
       if (holdTimer.current) clearTimeout(holdTimer.current);
       if (progressAnim.current) progressAnim.current.stop();
+      if (hapticInterval.current) clearInterval(hapticInterval.current);
     };
   }, []);
 
-  // Fill rises from bottom (0 → 90, matching inner circle height)
   const fillHeight = progress.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 90],

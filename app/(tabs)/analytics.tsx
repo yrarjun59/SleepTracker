@@ -1,6 +1,6 @@
 // app/(tabs)/analytics.tsx
-import { RecentEntriesList } from "@/components/analytics/RecentEntriesList";
 import { SleepBarChart } from "@/components/analytics/SleepBarChart";
+import { SleepLineChart } from "@/components/analytics/SleepLineChart";
 import { StatsGrid } from "@/components/analytics/StatsGrid";
 import { TimeFrameSelector } from "@/components/analytics/TimeFrameSelector";
 import { HistoryModal } from "@/components/home/HistoryModal";
@@ -9,14 +9,16 @@ import { useSleepEntries } from "@/hooks/useSleepEntries";
 import {
   DayData,
   getAllMonthsData,
+  getDailySleepTimes,
   getDailyStats,
   getLast12MonthsData,
   getLast30DaysData,
   getLast7DaysData,
+  getMonthlySleepTimes,
   getMonthlyStats,
   getScheduleConsistency,
+  SleepTimePoint,
 } from "@/utils/analyticsHelpers";
-
 import { Ionicons } from "@expo/vector-icons";
 import { usePathname } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -27,23 +29,17 @@ export default function AnalyticsScreen() {
   const insets = useSafeAreaInsets();
   const { entries, refresh } = useSleepEntries();
   const { colors } = useTheme();
-
   const [activePeriod, setActivePeriod] = useState<
     "Week" | "Month" | "Year" | "All"
   >("Week");
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
-  // Refresh data when the tab gains focus
   const pathname = usePathname();
   useEffect(() => {
-    if (pathname === "/analytics") {
-      refresh();
-    }
+    if (pathname === "/analytics") refresh();
   }, [pathname, refresh]);
 
-  // ----------------------------------------------
-  // 1. Chart data based on period
-  // ----------------------------------------------
+  // 1. Chart data (bar chart)
   const chartData: DayData[] = useMemo(() => {
     switch (activePeriod) {
       case "Week":
@@ -59,9 +55,24 @@ export default function AnalyticsScreen() {
     }
   }, [entries, activePeriod]);
 
-  // ----------------------------------------------
-  // 2. Chart title & date range
-  // ----------------------------------------------
+  // 2. Sleep time line chart data
+  const sleepTimeData: SleepTimePoint[] = useMemo(() => {
+    switch (activePeriod) {
+      case "Week":
+        return getDailySleepTimes(entries, 7);
+      case "Month":
+        return getDailySleepTimes(entries, 30);
+      case "Year":
+        return getMonthlySleepTimes(entries, 12);
+      case "All":
+        // All months from first entry to now (capped 24 months)
+        const months = getAllMonthsData(entries);
+        return getMonthlySleepTimes(entries, months.length);
+      default:
+        return [];
+    }
+  }, [entries, activePeriod]);
+
   const chartTitle = useMemo(() => {
     switch (activePeriod) {
       case "Week":
@@ -79,49 +90,29 @@ export default function AnalyticsScreen() {
     if (chartData.length === 0) return "";
     const first = chartData[0].fullDate;
     const last = chartData[chartData.length - 1].fullDate;
-
-    // For Year/All, fullDate is a month/year string
     if (activePeriod === "Year" || activePeriod === "All") {
       return `${first} - ${last}`;
     }
-
-    // For Week/Month, fullDate is YYYY-MM-DD
-    const format = (dateStr: string) => {
-      const d = new Date(dateStr + "T00:00:00");
-      return d.toLocaleDateString("en-US", {
+    const format = (dateStr: string) =>
+      new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
       });
-    };
     return `${format(first)} - ${format(last)}`;
   }, [chartData, activePeriod]);
 
-  // ----------------------------------------------
-  // 3. Horizontal scrolling (for 12+ bars)
-  // ----------------------------------------------
   const needsScroll = chartData.length >= 12;
   const chartWidth = needsScroll ? chartData.length * 35 : undefined;
 
-  // ----------------------------------------------
-  // 4. Stats (dynamic: daily for Week/Month, monthly for Year/All)
-  // ----------------------------------------------
   const isMonthlyView = activePeriod === "Year" || activePeriod === "All";
-
   const stats = useMemo(() => {
-    if (isMonthlyView) {
-      return getMonthlyStats(chartData);
-    } else {
-      return getDailyStats(chartData);
-    }
+    if (isMonthlyView) return getMonthlyStats(chartData);
+    return getDailyStats(chartData);
   }, [chartData, isMonthlyView]);
-
   const scheduleConsistency = isMonthlyView
     ? undefined
     : getScheduleConsistency(entries);
 
-  // ----------------------------------------------
-  // 5. Render
-  // ----------------------------------------------
   return (
     <View
       style={[
@@ -188,21 +179,33 @@ export default function AnalyticsScreen() {
           )}
         </View>
 
-        {/* Stat cards */}
+        {/* Line chart for sleep times */}
+        <View
+          style={[
+            styles.chartCard,
+            {
+              backgroundColor: colors.card,
+              borderColor: "rgba(255,255,255,0.05)",
+            },
+          ]}
+        >
+          <Text style={[styles.chartTitle, { color: colors.foreground }]}>
+            Sleep Times
+          </Text>
+          <SleepLineChart
+            data={sleepTimeData}
+            width={needsScroll ? Math.max(chartWidth ?? 0, 300) : 300}
+          />
+        </View>
+
+        {/* Stats grid moved to bottom */}
         <StatsGrid
           stats={stats}
           type={isMonthlyView ? "monthly" : "daily"}
           scheduleConsistency={scheduleConsistency}
         />
-
-        {/* Recent entries list */}
-        <RecentEntriesList
-          entries={entries}
-          onViewAll={() => setShowHistoryModal(true)}
-        />
       </ScrollView>
 
-      {/* History modal */}
       <HistoryModal
         visible={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
@@ -212,13 +215,10 @@ export default function AnalyticsScreen() {
   );
 }
 
+// styles unchanged except adding marginBottom to StatsGrid already via component
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 24,
-  },
+  container: { flex: 1 },
+  scrollContent: { paddingBottom: 24 },
   screenTitle: {
     fontSize: 28,
     fontWeight: "700",
@@ -244,16 +244,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 30,
   },
-  chartTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  dateRange: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  dateRangeText: {
-    fontSize: 12,
-  },
+  chartTitle: { fontSize: 15, fontWeight: "600" },
+  dateRange: { flexDirection: "row", alignItems: "center", gap: 4 },
+  dateRangeText: { fontSize: 12 },
 });

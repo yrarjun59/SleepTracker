@@ -21,6 +21,8 @@ export interface NotifPreferences {
   wakeupTime: string;
   quoteNotifications: boolean;
   setupComplete: boolean;
+  bedtimeReminderEnabled: boolean;
+  wakeupReminderEnabled: boolean;
 }
 
 interface NotificationContextType {
@@ -41,7 +43,13 @@ const defaultPrefs: NotifPreferences = {
   wakeupTime: "07:00",
   quoteNotifications: true,
   setupComplete: false,
+  bedtimeReminderEnabled: true,
+  wakeupReminderEnabled: true,
 };
+
+export async function cancelSpecificNotification(identifier: string) {
+  await Notifications.cancelScheduledNotificationAsync(identifier);
+}
 
 // ---------- Provider ----------
 export function NotificationProvider({
@@ -96,25 +104,29 @@ export function NotificationProvider({
 
   // 4. Schedule all reminders based on current prefs
   const scheduleAll = useCallback(async () => {
-    console.log("🔔 scheduleAll called with prefs:", prefs);
-
     const [bedHour, bedMin] = prefs.bedtime.split(":").map(Number);
     const [wakeHour, wakeMin] = prefs.wakeupTime.split(":").map(Number);
 
-    await scheduleBedtimeReminder(bedHour, bedMin);
-    await scheduleWakeupReminder(wakeHour, wakeMin);
+    if (prefs.bedtimeReminderEnabled) {
+      await scheduleBedtimeReminder(bedHour, bedMin);
+    } else {
+      await cancelSpecificNotification("bedtime");
+    }
+
+    if (prefs.wakeupReminderEnabled) {
+      await scheduleWakeupReminder(wakeHour, wakeMin);
+    } else {
+      await cancelSpecificNotification("wakeup");
+    }
 
     if (prefs.quoteNotifications) {
       await scheduleQuoteNotifications();
+    } else {
+      await cancelSpecificNotification("quote");
     }
 
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    console.log("📋 All scheduled after reschedule:");
-    scheduled.forEach((n) =>
-      console.log(
-        `  • ${n.identifier} → trigger: ${JSON.stringify(n.trigger)}, title: "${n.content.title}"`,
-      ),
-    );
+    console.log("📋 All scheduled after reschedule:", scheduled);
   }, [prefs]);
 
   const cancelAll = useCallback(async () => {

@@ -1,3 +1,5 @@
+// app/(tabs)/profile.tsx
+import { ConfirmClearDataModal } from "@/components/ConfirmClearDataModal";
 import { NotificationSettingsModal } from "@/components/profile/NotificationSettingsModal";
 import { SettingsRow } from "@/components/profile/SettingsRow";
 import { useAlert } from "@/contexts/AlertContext";
@@ -5,14 +7,21 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useSleepEntries } from "@/hooks/useSleepEntries";
-import { deleteAllUserEntries } from "@/services/cloudStorage";
+import { deleteAllUserEntries, pushEntry } from "@/services/cloudStorage";
+import * as sleepStorage from "@/services/sleepStorage";
+import { SleepEntry } from "@/types/sleep";
+import { entriesToCSV, parseCSV } from "@/utils/csvHelper";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import * as Sharing from "expo-sharing";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -22,31 +31,35 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { pushEntry } from "@/services/cloudStorage";
-import * as sleepStorage from "@/services/sleepStorage";
-import { SleepEntry } from "@/types/sleep";
-import { parseCSV } from "@/utils/csvHelper";
-import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system/legacy";
-import { Platform } from "react-native";
-
 export default function ProfileScreen() {
-  const [showNotifSettings, setShowNotifSettings] = useState(false);
   const insets = useSafeAreaInsets();
   const { showAlert } = useAlert();
   const router = useRouter();
-  const { user, profile, signInWithGoogle, logout, authLoading } = useAuth();
+  const { user, profile, signInWithGoogle, logout, authLoading, signInError } =
+    useAuth();
+  const { timeFormat, setTimeFormat } = useSettings();
+  const { colors } = useTheme();
+  const { refresh } = useSleepEntries();
 
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState("");
   const [working, setWorking] = useState(false);
   const [workingMessage, setWorkingMessage] = useState("");
-  const { timeFormat, setTimeFormat } = useSettings();
+  const [showNotifSettings, setShowNotifSettings] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-  const { colors } = useTheme();
-  const { refresh } = useSleepEntries();
+  useEffect(() => {
+    if (signInError) {
+      showAlert({
+        type: "error",
+        title: "Google Sign-In Failed",
+        message: signInError,
+        autoDismiss: false, // keep until user closes
+      });
+    }
+  }, [signInError]);
 
-  // ---------- Import & Export ----------
+  // ---------- Import ----------
   const handleImport = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -86,7 +99,6 @@ export default function ProfileScreen() {
         return;
       }
 
-      // Filter future dates
       const todayStr = new Date().toISOString().split("T")[0];
       const pastAndTodayEntries = importedEntries.filter(
         (e) => e.date <= todayStr,
@@ -185,152 +197,140 @@ export default function ProfileScreen() {
     }
   };
 
-  // // ---------- Export ----------
-  // const handleExport = async () => {
-  //   try {
-  //     setWorking(true);
-  //     const allEntries = await sleepStorage.getAllEntries();
-  //     if (allEntries.length === 0) {
-  //       showAlert({
-  //         type: "info",
-  //         title: "No data",
-  //         message: "There are no sleep entries to export.",
-  //         autoDismiss: true,
-  //       });
-  //       setWorking(false);
-  //       return;
-  //     }
+  // ---------- Export ----------
+  const handleExport = async () => {
+    try {
+      setWorking(true);
+      setWorkingMessage("Preparing export…");
+      const allEntries = await sleepStorage.getAllEntries();
+      if (allEntries.length === 0) {
+        showAlert({
+          type: "info",
+          title: "No data",
+          message: "There are no sleep entries to export.",
+          autoDismiss: true,
+        });
+        setWorking(false);
+        setWorkingMessage("");
+        return;
+      }
 
-  //     if (allEntries.length < 7) {
-  //       showAlert({
-  //         type: "confirm",
-  //         title: "Just a few entries",
-  //         message: `You only have ${allEntries.length} sleep entries. The file will be small. Export anyway?`,
-  //         actions: [
-  //           {
-  //             text: "Cancel",
-  //             style: "cancel",
-  //             onPress: () => setWorking(false),
-  //           },
-  //           {
-  //             text: "Export",
-  //             onPress: async () => {
-  //               await performExport(allEntries);
-  //             },
-  //           },
-  //         ],
-  //       });
-  //       return;
-  //     }
+      if (allEntries.length < 7) {
+        showAlert({
+          type: "confirm",
+          title: "Just a few entries",
+          message: `You only have ${allEntries.length} sleep entries. The file will be small. Export anyway?`,
+          actions: [
+            {
+              text: "Cancel",
+              style: "cancel",
+              onPress: () => {
+                setWorking(false);
+                setWorkingMessage("");
+              },
+            },
+            {
+              text: "Export",
+              onPress: async () => {
+                await performExport(allEntries);
+              },
+            },
+          ],
+        });
+        return;
+      }
 
-  //     await performExport(allEntries);
-  //   } catch (error) {
-  //     console.error("❌ Export failed:", error);
-  //     showAlert({
-  //       type: "error",
-  //       title: "Export failed",
-  //       message: "Could not export data. Please try again.",
-  //       autoDismiss: true,
-  //     });
-  //     setWorking(false);
-  //     setWorkingMessage("Exporting…");
-  //   }
-  // };
+      await performExport(allEntries);
+    } catch (error) {
+      console.error("Export failed:", error);
+      showAlert({
+        type: "error",
+        title: "Export failed",
+        message: "Could not export data. Please try again.",
+        autoDismiss: true,
+      });
+      setWorking(false);
+      setWorkingMessage("");
+    }
+  };
 
-  // const performExport = async (entries: SleepEntry[]) => {
-  //   try {
-  //     const csv = entriesToCSV(entries);
-  //     const today = new Date().toISOString().split("T")[0];
-  //     const fileName = `${today}-sleepdata.csv`;
-  //     const localPath = FileSystem.documentDirectory + fileName;
+  const performExport = async (entries: SleepEntry[]) => {
+    try {
+      const csv = entriesToCSV(entries);
+      const today = new Date().toISOString().split("T")[0];
+      const fileName = `${today}-sleepdata.csv`;
+      const localPath = FileSystem.documentDirectory + fileName;
 
-  //     await FileSystem.writeAsStringAsync(localPath, csv, {
-  //       encoding: FileSystem.EncodingType.UTF8,
-  //     });
+      await FileSystem.writeAsStringAsync(localPath, csv, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
 
-  //     console.log("✅ Export successful");
-  //     console.log("   File name:", fileName);
-  //     console.log("   Full path:", localPath);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(localPath, {
+          mimeType: "text/csv",
+          dialogTitle: "Save your sleep data",
+          UTI: "public.comma-separated-values-text",
+        });
+      }
 
-  //     showAlert({
-  //       type: "success",
-  //       title: "Saved",
-  //       message: `Saved as ${fileName}`,
-  //       autoDismiss: true,
-  //     });
-  //   } catch (error) {
-  //     console.error("❌ Export failed:", error);
-  //     showAlert({
-  //       type: "error",
-  //       title: "Export failed",
-  //       message: "Could not export data. Please try again.",
-  //       autoDismiss: true,
-  //     });
-  //   } finally {
-  //     setWorking(false);
-  //   }
-  // };
+      showAlert({
+        type: "success",
+        title: "Saved",
+        message: `Saved as ${fileName}`,
+        autoDismiss: true,
+      });
+    } catch (error) {
+      console.error("Export failed:", error);
+      showAlert({
+        type: "error",
+        title: "Export failed",
+        message: "Could not export data. Please try again.",
+        autoDismiss: true,
+      });
+    } finally {
+      setWorking(false);
+      setWorkingMessage("");
+    }
+  };
 
+  // ---------- Clear All Data (GitHub-style confirmation) ----------
   const handleClearData = () => {
-    const message = user
-      ? "This will permanently delete all sleep records (local AND cloud). Continue?"
-      : "This will permanently delete all local sleep records. Continue?";
+    setShowClearConfirm(true);
+  };
 
-    showAlert({
-      type: "warning",
-      title: "Clear All Data",
-      message,
-      actions: [
-        { text: "Cancel", style: "cancel", onPress: () => {} },
-        {
-          text: "Clear",
-          style: "destructive",
-          onPress: async () => {
-            setWorking(true);
-            try {
-              // 1. Delete cloud entries if logged in
-              if (user) {
-                try {
-                  await deleteAllUserEntries(user.uid);
-                } catch (cloudError) {
-                  console.warn(
-                    "Cloud deletion failed (continuing):",
-                    cloudError,
-                  );
-                }
-              }
+  const confirmClearAllData = async () => {
+    setWorking(true);
+    setWorkingMessage("Clearing data…");
+    try {
+      if (user) {
+        try {
+          await deleteAllUserEntries(user.uid);
+        } catch (cloudError) {
+          console.warn("Cloud deletion failed (continuing):", cloudError);
+        }
+      }
 
-              // 2. Clear local storage
-              await AsyncStorage.multiRemove([
-                "@sleep_entries",
-                "@incomplete_sleep",
-              ]);
+      await AsyncStorage.multiRemove(["@sleep_entries", "@incomplete_sleep"]);
+      refresh();
 
-              // 3. Refresh the data in memory (so UI goes to empty state)
-              refresh();
-
-              // 4. Show success and navigate to Home
-              showAlert({
-                type: "success",
-                title: "Done",
-                message: "All data cleared.",
-                autoDismiss: true,
-              });
-              router.replace("/(tabs)");
-            } catch (error) {
-              showAlert({
-                type: "error",
-                title: "Error",
-                message: "Could not clear data. Please try again.",
-                autoDismiss: true,
-              });
-            } finally {
-              setWorking(false);
-            }
-          },
-        },
-      ],
-    });
+      showAlert({
+        type: "success",
+        title: "Done",
+        message: "All data cleared.",
+        autoDismiss: true,
+      });
+      router.replace("/(tabs)");
+    } catch (error) {
+      showAlert({
+        type: "error",
+        title: "Error",
+        message: "Could not clear data. Please try again.",
+        autoDismiss: true,
+      });
+    } finally {
+      setWorking(false);
+      setWorkingMessage("");
+    }
   };
 
   return (
@@ -379,7 +379,10 @@ export default function ProfileScreen() {
             <View style={{ alignItems: "center" }}>
               <TouchableOpacity
                 style={styles.googleButton}
-                onPress={() => signInWithGoogle()}
+                onPress={() => {
+                  console.log("👆 Sign in with Google button pressed");
+                  signInWithGoogle().catch(() => {});
+                }}
               >
                 <Ionicons name="logo-google" size={20} color="#fff" />
                 <Text style={styles.googleButtonText}>Sign in with Google</Text>
@@ -420,7 +423,7 @@ export default function ProfileScreen() {
               <Text
                 style={[styles.toggleValue, { color: colors.textSecondary }]}
               >
-                {timeFormat === "12h" ? "12‑hour" : "24‑hour"}
+                {timeFormat === "12h" ? "12-hour" : "24-hour"}
               </Text>
               <Switch
                 value={timeFormat === "24h"}
@@ -430,6 +433,7 @@ export default function ProfileScreen() {
               />
             </View>
           </View>
+
           <SettingsRow
             icon="notifications-outline"
             label="Notifications"
@@ -442,11 +446,11 @@ export default function ProfileScreen() {
             onPress={handleImport}
           />
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          {/* <SettingsRow
+          <SettingsRow
             icon="share-outline"
             label="Export Data"
             onPress={handleExport}
-          /> */}
+          />
         </View>
 
         {/* Support */}
@@ -524,9 +528,21 @@ export default function ProfileScreen() {
           )}
         </View>
       )}
+
+      {/* Notification settings modal */}
       <NotificationSettingsModal
         visible={showNotifSettings}
         onClose={() => setShowNotifSettings(false)}
+      />
+
+      {/* Clear data confirmation modal */}
+      <ConfirmClearDataModal
+        visible={showClearConfirm}
+        onCancel={() => setShowClearConfirm(false)}
+        onConfirm={() => {
+          setShowClearConfirm(false);
+          confirmClearAllData();
+        }}
       />
     </View>
   );

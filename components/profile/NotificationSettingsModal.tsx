@@ -4,10 +4,13 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useFormattedTime } from "@/utils/formatTime";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
 import { useEffect, useRef, useState } from "react";
-
 import {
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,11 +19,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-import DateTimePicker, {
-  DateTimePickerAndroid,
-} from "@react-native-community/datetimepicker";
-import { Platform } from "react-native";
 
 interface Props {
   visible: boolean;
@@ -34,9 +32,8 @@ export function NotificationSettingsModal({ visible, onClose }: Props) {
   const { prefs, updatePrefs } = useNotifications();
   const { showAlert } = useAlert();
   const formatTime = useFormattedTime();
-  const isPickerOpen = useRef(false); // single declaration
+  const isPickerOpen = useRef(false);
 
-  // Track unsaved changes
   const [hasChanges, setHasChanges] = useState(false);
 
   const initialBedtime = new Date();
@@ -67,54 +64,25 @@ export function NotificationSettingsModal({ visible, onClose }: Props) {
     return `Reminder in ${diffH}h ${diffM}m`;
   };
 
-  // Save and show confirmation
   const saveTimes = async () => {
     const pad = (n: number) => n.toString().padStart(2, "0");
     const bedtime = `${pad(bedtimeDate.getHours())}:${pad(bedtimeDate.getMinutes())}`;
     const wakeup = `${pad(wakeupDate.getHours())}:${pad(wakeupDate.getMinutes())}`;
     await updatePrefs({ bedtime, wakeupTime: wakeup });
-
-    // Determine which reminder is closest
-    const nowMs = Date.now();
-    const bedMs = bedtimeDate.getTime();
-    const wakeMs = wakeupDate.getTime();
-
-    let nextLabel = "";
-    if (bedMs <= nowMs && wakeMs <= nowMs) {
-      nextLabel = "Next reminders start tomorrow";
-    } else {
-      const nextDate =
-        bedMs > nowMs && (bedMs < wakeMs || wakeMs <= nowMs)
-          ? bedtimeDate
-          : wakeupDate;
-
-      const remaining = getRemainingTime(nextDate);
-      const isBedtime = nextDate === bedtimeDate;
-      nextLabel = `${isBedtime ? "Bedtime" : "Wake‑up"} ${remaining.replace("Reminder in ", "")}`;
-    }
-
-    showAlert({
-      type: "success",
-      title: "Reminders saved",
-      message: nextLabel,
-      autoDismiss: true,
-    });
-
     setHasChanges(false);
     onClose();
+    showAlert({
+      type: "success",
+      title: "Reminders updated",
+      message: "Your sleep times have been saved.",
+      autoDismiss: true,
+    });
   };
 
-  const markChanged = (fn?: () => void) => {
-    setHasChanges(true);
-    fn?.();
-  };
-
-  const is24Hour = timeFormat === "24h";
-
-  // ---- Android picker effect ----
+  // Android picker effect
   useEffect(() => {
     if (pickerTarget === null || Platform.OS !== "android") return;
-    if (isPickerOpen.current) return; // already open
+    if (isPickerOpen.current) return;
 
     isPickerOpen.current = true;
     const currentDate = pickerTarget === "bedtime" ? bedtimeDate : wakeupDate;
@@ -122,18 +90,27 @@ export function NotificationSettingsModal({ visible, onClose }: Props) {
     DateTimePickerAndroid.open({
       value: currentDate,
       mode: "time",
-      is24Hour,
+      is24Hour: timeFormat === "24h",
       onChange: (event, date) => {
         isPickerOpen.current = false;
         if (event.type === "set" && date) {
-          markChanged();
-          if (pickerTarget === "bedtime") setBedtimeDate(date);
-          else if (pickerTarget === "wakeup") setWakeupDate(date);
+          if (pickerTarget === "bedtime") {
+            setBedtimeDate(date);
+            // Auto-enable bedtime reminder if it was off
+            if (!prefs.bedtimeReminderEnabled)
+              updatePrefs({ bedtimeReminderEnabled: true });
+          } else if (pickerTarget === "wakeup") {
+            setWakeupDate(date);
+            // Auto-enable wake-up reminder if it was off
+            if (!prefs.wakeupReminderEnabled)
+              updatePrefs({ wakeupReminderEnabled: true });
+          }
+          setHasChanges(true);
         }
         setPickerTarget(null);
       },
     });
-  }, [pickerTarget]); // depends only on pickerTarget
+  }, [pickerTarget]);
 
   return (
     <Modal
@@ -152,43 +129,47 @@ export function NotificationSettingsModal({ visible, onClose }: Props) {
               Notification Settings
             </Text>
 
-            {/* ---- REMINDERS ---- */}
-            <Text
-              style={[styles.sectionHeader, { color: colors.mutedForeground }]}
-            >
-              REMINDERS
-            </Text>
-            <View style={[styles.card, { backgroundColor: colors.muted }]}>
-              <View style={styles.row}>
-                <View style={styles.rowLeft}>
-                  <Text style={[styles.label, { color: colors.foreground }]}>
-                    Bedtime reminder
-                  </Text>
-                  <Text
-                    style={[styles.sublabel, { color: colors.textSecondary }]}
-                  >
-                    {formatTime(bedtimeDate)} daily
-                  </Text>
-                </View>
-                <Switch
-                  value={prefs.setupComplete}
-                  onValueChange={(value) =>
-                    markChanged(() => updatePrefs({ setupComplete: value }))
-                  }
-                  trackColor={{ false: colors.muted, true: colors.accent }}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[styles.timeButton, { borderColor: colors.border }]}
-                onPress={() => setPickerTarget("bedtime")}
-              >
-                <Text
-                  style={[styles.timeButtonText, { color: colors.foreground }]}
-                >
-                  {formatTime(bedtimeDate)}
+            {/* ---- Bedtime Reminder ---- */}
+            <View style={styles.row}>
+              <View style={styles.rowLeft}>
+                <Text style={[styles.label, { color: colors.foreground }]}>
+                  Bedtime reminder
                 </Text>
-              </TouchableOpacity>
+                <Text
+                  style={[styles.sublabel, { color: colors.textSecondary }]}
+                >
+                  {prefs.bedtimeReminderEnabled ? "Enabled" : "Disabled"}
+                </Text>
+              </View>
+              <Switch
+                value={prefs.bedtimeReminderEnabled}
+                onValueChange={(value) => {
+                  setHasChanges(true);
+                  updatePrefs({ bedtimeReminderEnabled: value });
+                }}
+                trackColor={{ false: colors.muted, true: colors.accent }}
+              />
+            </View>
+
+            {/* Bedtime picker disabled if reminder off */}
+            <TouchableOpacity
+              style={[
+                styles.timeButton,
+                {
+                  borderColor: colors.border,
+                  opacity: prefs.bedtimeReminderEnabled ? 1 : 0.5,
+                },
+              ]}
+              disabled={!prefs.bedtimeReminderEnabled}
+              onPress={() => setPickerTarget("bedtime")}
+            >
+              <Text
+                style={[styles.timeButtonText, { color: colors.foreground }]}
+              >
+                {formatTime(bedtimeDate)}
+              </Text>
+            </TouchableOpacity>
+            {prefs.bedtimeReminderEnabled && (
               <Text
                 style={[
                   styles.remainingText,
@@ -197,17 +178,49 @@ export function NotificationSettingsModal({ visible, onClose }: Props) {
               >
                 {getRemainingTime(bedtimeDate)}
               </Text>
+            )}
 
-              <TouchableOpacity
-                style={[styles.timeButton, { borderColor: colors.border }]}
-                onPress={() => setPickerTarget("wakeup")}
-              >
-                <Text
-                  style={[styles.timeButtonText, { color: colors.foreground }]}
-                >
-                  {formatTime(wakeupDate)}
+            {/* ---- Wake-up Reminder ---- */}
+            <View style={styles.row}>
+              <View style={styles.rowLeft}>
+                <Text style={[styles.label, { color: colors.foreground }]}>
+                  Wake‑up reminder
                 </Text>
-              </TouchableOpacity>
+                <Text
+                  style={[styles.sublabel, { color: colors.textSecondary }]}
+                >
+                  {prefs.wakeupReminderEnabled ? "Enabled" : "Disabled"}
+                </Text>
+              </View>
+              <Switch
+                value={prefs.wakeupReminderEnabled}
+                onValueChange={(value) => {
+                  setHasChanges(true);
+                  updatePrefs({ wakeupReminderEnabled: value });
+                }}
+                trackColor={{ false: colors.muted, true: colors.accent }}
+              />
+            </View>
+
+            {/* Wake-up picker disabled if reminder off */}
+            <TouchableOpacity
+              style={[
+                styles.timeButton,
+                {
+                  borderColor: colors.border,
+                  opacity: prefs.wakeupReminderEnabled ? 1 : 0.5,
+                },
+              ]}
+              disabled={!prefs.wakeupReminderEnabled}
+              onPress={() => setPickerTarget("wakeup")}
+            >
+              <Text
+                style={[styles.timeButtonText, { color: colors.foreground }]}
+              >
+                {formatTime(wakeupDate)}
+              </Text>
+            </TouchableOpacity>
+            {prefs.wakeupReminderEnabled && (
               <Text
                 style={[
                   styles.remainingText,
@@ -216,9 +229,9 @@ export function NotificationSettingsModal({ visible, onClose }: Props) {
               >
                 {getRemainingTime(wakeupDate)}
               </Text>
-            </View>
+            )}
 
-            {/* ---- QUOTES ---- */}
+            {/* ---- Quotes ---- */}
             <Text
               style={[styles.sectionHeader, { color: colors.mutedForeground }]}
             >
@@ -233,16 +246,15 @@ export function NotificationSettingsModal({ visible, onClose }: Props) {
                   <Text
                     style={[styles.sublabel, { color: colors.textSecondary }]}
                   >
-                    Receive 5 inspiring quotes throughout the day
+                    Receive one inspiring quote per day
                   </Text>
                 </View>
                 <Switch
                   value={prefs.quoteNotifications}
-                  onValueChange={(value) =>
-                    markChanged(() =>
-                      updatePrefs({ quoteNotifications: value }),
-                    )
-                  }
+                  onValueChange={(value) => {
+                    setHasChanges(true);
+                    updatePrefs({ quoteNotifications: value });
+                  }}
                   trackColor={{ false: colors.muted, true: colors.accent }}
                 />
               </View>
@@ -258,10 +270,11 @@ export function NotificationSettingsModal({ visible, onClose }: Props) {
               activeOpacity={0.7}
             >
               <Text
-                style={[
-                  styles.doneText,
-                  { color: hasChanges ? "#fff" : colors.textSecondary },
-                ]}
+                style={{
+                  color: hasChanges ? "#fff" : colors.textSecondary,
+                  fontWeight: "600",
+                  fontSize: 16,
+                }}
               >
                 Done
               </Text>
@@ -276,24 +289,30 @@ export function NotificationSettingsModal({ visible, onClose }: Props) {
           value={pickerTarget === "bedtime" ? bedtimeDate : wakeupDate}
           mode="time"
           display="spinner"
-          is24Hour={is24Hour}
+          is24Hour={timeFormat === "24h"}
           onChange={(event, date) => {
             if (date) {
-              markChanged();
-              if (pickerTarget === "bedtime") setBedtimeDate(date);
-              else if (pickerTarget === "wakeup") setWakeupDate(date);
+              if (pickerTarget === "bedtime") {
+                setBedtimeDate(date);
+                if (!prefs.bedtimeReminderEnabled)
+                  updatePrefs({ bedtimeReminderEnabled: true });
+              } else if (pickerTarget === "wakeup") {
+                setWakeupDate(date);
+                if (!prefs.wakeupReminderEnabled)
+                  updatePrefs({ wakeupReminderEnabled: true });
+              }
+              setHasChanges(true);
             }
             setPickerTarget(null);
           }}
         />
       )}
-
-      {/* Android picker is handled by the useEffect above – nothing to render here */}
     </Modal>
   );
 }
 
-
+// Styles remain mostly the same, but ensure you have all necessary styles.
+// Add missing `sectionHeader`, `card`, `remainingText`, `timeButton`, `doneButton`, etc.
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -306,24 +325,7 @@ const styles = StyleSheet.create({
     padding: 24,
     maxHeight: "80%",
   },
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    fontSize: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  card: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 8,
-  },
+  title: { fontSize: 22, fontWeight: "700", marginBottom: 24 },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -342,17 +344,29 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   timeButtonText: { fontSize: 16 },
-  doneButton: {
-    borderRadius: 14,
-    padding: 14,
-    alignItems: "center",
-    marginTop: 24,
-  },
-  doneText: { fontWeight: "600", fontSize: 16 },
   remainingText: {
     fontSize: 12,
     marginTop: 4,
     marginBottom: 12,
     textAlign: "center",
+  },
+  sectionHeader: {
+    fontSize: 12,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  card: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 8,
+  },
+  doneButton: {
+    borderRadius: 14,
+    padding: 14,
+    alignItems: "center",
+    marginTop: 24,
   },
 });

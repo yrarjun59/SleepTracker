@@ -2,9 +2,15 @@ import { SleepEntry } from "@/types/sleep";
 import { calculateDuration } from "@/utils/calculations";
 import { parseLocalDateTime, toLocalISOString } from "@/utils/dateHelpers";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
 const STORAGE_KEY = "@sleep_entries";
 const INCOMPLETE_KEY = "@incomplete_sleep";
+
+function generateId(): string {
+  const now = new Date();
+  const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  const timePart = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+  return `${datePart}T${timePart}`;
+}
 
 // ---------- Helpers ----------
 async function getAll(): Promise<SleepEntry[]> {
@@ -29,7 +35,7 @@ export async function getIncompleteEntry(): Promise<SleepEntry | null> {
 export async function startSleep(): Promise<SleepEntry> {
   const now = toLocalISOString(new Date());
   const entry: SleepEntry = {
-    id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+    id: generateId(),
     date: now.split("T")[0],
     sleepTime: now,
     wakeTime: null,
@@ -47,7 +53,7 @@ export async function addManualEntry(
 ): Promise<SleepEntry> {
   const newEntry: SleepEntry = {
     ...entry,
-    id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+    id: generateId(),
     createdAt: new Date().toISOString(),
   };
 
@@ -93,6 +99,8 @@ export async function finishSleep(): Promise<SleepEntry | null> {
   const all = await getAll();
   all.unshift(completed);
   await saveAll(all);
+
+  await AsyncStorage.removeItem(INCOMPLETE_KEY);
 
   return completed;
 }
