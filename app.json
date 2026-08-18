@@ -12,7 +12,12 @@
     },
     "android": {
       "adaptiveIcon": {
+<<<<<<< HEAD
         "backgroundColor": "#E6F4FE"
+=======
+        "backgroundColor": "#E6F4FE",
+       
+>>>>>>> 19e07e468f7080d5b95cf46f59dafd8db87952bf
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.yrexpo.SleepTracker"
