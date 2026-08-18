@@ -58,6 +58,7 @@ export function NotificationProvider({
   children: React.ReactNode;
 }) {
   const [prefs, setPrefs] = useState<NotifPreferences>(defaultPrefs);
+  const [loaded, setLoaded] = useState(false);
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -72,13 +73,14 @@ export function NotificationProvider({
         setPrefs(p);
       }
       setLoading(false);
+      setLoaded(true);
     })();
   }, []);
 
   // 2. Save prefs whenever they change
   useEffect(() => {
     AsyncStorage.setItem("@notif_prefs", JSON.stringify(prefs));
-  }, [prefs]);
+  }, [prefs, loaded]);
 
   // 3. Create Android notification channel
   useEffect(() => {

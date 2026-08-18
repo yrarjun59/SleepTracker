@@ -1,7 +1,9 @@
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AlertProvider } from "@/contexts/AlertContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
+import { SleepEntriesProvider } from "@/contexts/SleepEntriesContext";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import {
   startQuoteRefresher,
@@ -12,7 +14,6 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-
 // 1) Inner component – can safely use `useTheme`
 function AppContent() {
   const { mode } = useTheme();
@@ -51,7 +52,11 @@ export default function RootLayout() {
         <AlertProvider>
           <NotificationProvider>
             <SettingsProvider>
-              <AppContent />
+              <SleepEntriesProvider>
+                <ErrorBoundary>
+                  <AppContent />
+                </ErrorBoundary>
+              </SleepEntriesProvider>
             </SettingsProvider>
           </NotificationProvider>
         </AlertProvider>

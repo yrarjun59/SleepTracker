@@ -13,7 +13,13 @@ function getRelativeTimeLabel(lastWake: Date): string {
   const diffMs = now.getTime() - lastWake.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  if (diffDays < 1) return "18+ hrs";
+  if (diffDays < 1) {
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    if (hours === 0) return `${minutes}m`;
+    return `${hours}h ${minutes}m`;
+  }
+
   if (diffDays === 1) return "1 day";
   if (diffDays < 7) return `${diffDays} days`;
   if (diffDays < 14) return "1 week";
@@ -109,6 +115,17 @@ export function TodaySleepCard({
         </View>
       );
     }
+    if (!isSleeping && !isEmpty && sleepTime && wakeTime && duration) {
+      return (
+        <View style={[styles.recentSleep, { borderTopColor: colors.border }]}>
+          <Text
+            style={[styles.lastSleepDetail, { color: colors.textSecondary }]}
+          >
+            Last sleep: {sleepTime} → {wakeTime} · {duration}
+          </Text>
+        </View>
+      );
+    }
 
     if (lastCompletedEntry && hoursAwake != null) {
       const lastSleep = parseLocalDateTime(lastCompletedEntry.sleepTime);
@@ -170,6 +187,19 @@ export function TodaySleepCard({
     <View style={[styles.card, { backgroundColor: colors.card }]}>
       <Text style={[styles.label, { color: colors.mutedForeground }]}>
         {topLabel}
+        {!isSleeping && !isEmpty && sleepTime && wakeTime && duration && (
+          <View style={styles.todaySummary}>
+            <Ionicons
+              name="bed-outline"
+              size={14}
+              color={colors.accent}
+              style={{ marginRight: 4 }}
+            />
+            <Text style={[styles.summaryText, { color: colors.textSecondary }]}>
+              {sleepTime} → {wakeTime} · {duration}
+            </Text>
+          </View>
+        )}
       </Text>
       {quoteSection}
       {renderBelow()}
@@ -248,5 +278,15 @@ const styles = StyleSheet.create({
   },
   lastSleepDetail: {
     fontSize: 12,
+  },
+  todaySummary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  summaryText: {
+    fontSize: 13,
   },
 });

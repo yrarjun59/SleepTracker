@@ -22,10 +22,13 @@ export function HoldToRecordButton({ onComplete }: Props) {
     hasFired.current = false;
     setHolding(true);
 
-    // Continuous haptic while holding (every 500ms)
+    // Immediate haptic feedback on press start
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // Continuous haptic feedback while holding (every 400ms)
     hapticInterval.current = setInterval(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }, 500);
+    }, 400);
 
     progress.setValue(0);
 
@@ -36,7 +39,6 @@ export function HoldToRecordButton({ onComplete }: Props) {
     });
     progressAnim.current.start();
 
-    // Hold for 3 seconds, then complete
     holdTimer.current = setTimeout(() => {
       hasFired.current = true;
       onComplete();
@@ -61,6 +63,7 @@ export function HoldToRecordButton({ onComplete }: Props) {
     }
     if (hapticInterval.current) {
       clearInterval(hapticInterval.current);
+      console.log("Vibrate tick");
       hapticInterval.current = null;
     }
     setHolding(false);
@@ -87,6 +90,7 @@ export function HoldToRecordButton({ onComplete }: Props) {
       onPressOut={cancelHold}
       pressRetentionOffset={{ top: 40, bottom: 40, left: 40, right: 40 }}
       style={styles.container}
+      testID="hold-to-record-button"
     >
       <View style={[styles.outerCircle, { borderColor: colors.primary }]}>
         <Animated.View style={[styles.fill, { height: fillHeight }]} />

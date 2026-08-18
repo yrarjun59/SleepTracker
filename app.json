@@ -29,7 +29,13 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "cover",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#0D1117",
+          "containmentMode": "cover",
+          "statusBar": {
+            "translucent": true,
+            "hidden": true,
+            "style": "light"
+          }
         }
       ],
       "expo-sharing",
@@ -37,13 +43,15 @@
       "expo-web-browser"
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "tsconfigPaths": true
     },
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "6037817c-a3a1-4ed0-aaff-2a3a363196c6"
+        "projectId": "603aea23-b342-49c3-b11c-12bbe78fbde0"
       }
-    }
+    },
+    "owner": "dadaexpo"
   }
 }

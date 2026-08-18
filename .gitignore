@@ -57,3 +57,9 @@ skills-lock.json
 /.env/
 
 /__tests__/
+
+tsconfig.json
+
+firebase.rules
+firebase.json
+firebaseConfig.ts 

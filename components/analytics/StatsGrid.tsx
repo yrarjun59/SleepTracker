@@ -1,3 +1,4 @@
+// components/analytics/StatsGrid.tsx
 import { useTheme } from "@/contexts/ThemeContext";
 import { DailyStats, MonthlyStats } from "@/utils/analyticsHelpers";
 import { StyleSheet, Text, View } from "react-native";
@@ -25,7 +26,12 @@ export function StatsGrid({
     value: string;
     unit: string;
   }) => (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.card, borderColor: colors.border },
+      ]}
+    >
       <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>
         {label}
       </Text>
@@ -40,47 +46,67 @@ export function StatsGrid({
     </View>
   );
 
+  if (isDaily) {
+    const daily = stats as DailyStats;
+    return (
+      <View style={styles.grid}>
+        <View style={styles.row}>
+          <StatCard
+            label="Avg Duration"
+            value={daily.avgHours.toFixed(1)}
+            unit="hrs"
+          />
+          <StatCard
+            label="Best Night"
+            value={daily.bestDay.hours.toFixed(1)}
+            unit="hrs"
+          />
+        </View>
+        <View style={styles.row}>
+          <StatCard
+            label="Worst Night"
+            value={daily.worstDay.hours.toFixed(1)}
+            unit="hrs"
+          />
+          {scheduleConsistency && (
+            <StatCard
+              label="Consistency"
+              value={`${scheduleConsistency.consistentNights}/${scheduleConsistency.totalNights}`}
+              unit="nights"
+            />
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  // Monthly view
+  const monthly = stats as MonthlyStats;
   return (
     <View style={styles.grid}>
       <View style={styles.row}>
         <StatCard
-          label={isDaily ? "Avg Duration" : "Avg Monthly"}
-          value={(stats as any).avgHours.toFixed(1)}
-          unit="hrs"
+          label="Avg Monthly"
+          value={monthly.avgHours.toFixed(1)}
+          unit="hrs/night"
         />
         <StatCard
-          label={isDaily ? "Best Night" : "Best Month"}
-          value={
-            isDaily
-              ? (stats as DailyStats).bestDay.hours.toFixed(1)
-              : (stats as MonthlyStats).bestMonth.hours.toFixed(1)
-          }
+          label="Best Month"
+          value={monthly.bestMonth.hours.toFixed(1)}
           unit="hrs"
         />
       </View>
       <View style={styles.row}>
         <StatCard
-          label={isDaily ? "Worst Night" : "Worst Month"}
-          value={
-            isDaily
-              ? (stats as DailyStats).worstDay.hours.toFixed(1)
-              : (stats as MonthlyStats).worstMonth.hours.toFixed(1)
-          }
+          label="Worst Month"
+          value={monthly.worstMonth.hours.toFixed(1)}
           unit="hrs"
         />
-        {isDaily && scheduleConsistency ? (
-          <StatCard
-            label="Consistency"
-            value={`${scheduleConsistency.consistentNights}/${scheduleConsistency.totalNights}`}
-            unit="nights"
-          />
-        ) : (
-          <StatCard
-            label="Months"
-            value={`${(stats as MonthlyStats).monthsTracked}`}
-            unit="tracked"
-          />
-        )}
+        <StatCard
+          label="Goal"
+          value={`${monthly.targetPercent}%`}
+          unit="of 7h/night"
+        />
       </View>
     </View>
   );
@@ -101,11 +127,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
   },
   cardLabel: {
     fontSize: 11,

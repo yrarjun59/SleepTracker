@@ -2,6 +2,7 @@
 import { useAlert } from "@/contexts/AlertContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useSleepEntries } from "@/contexts/SleepEntriesContext";
 import { pushEntry } from "@/services/cloudStorage";
 import * as sleepStorage from "@/services/sleepStorage";
 import { calculateDuration } from "@/utils/calculations";
@@ -38,6 +39,7 @@ export function AddPastSleepModal({ visible, onClose, onSaved }: Props) {
   const { timeFormat } = useSettings();
   const is24Hour = timeFormat === "24h";
   const formatTime = useFormattedTime();
+  const { deleteEntry } = useSleepEntries();
 
   const [sleepDate, setSleepDate] = useState(() => {
     const d = new Date();

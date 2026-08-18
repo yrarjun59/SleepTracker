@@ -33,7 +33,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     GoogleSignin.configure({
       webClientId:
-        // "210765465869-3nqugstugo9mep0o6nv9scu0ia0sohbd.apps.googleusercontent.com",
         "210765465869-3nqugstugo9mep0o6nv9scu0ia0sohbd.apps.googleusercontent.com",
     });
   }, []);
@@ -94,6 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("✅ Signed in successfully");
     } catch (error: any) {
       console.error("Google Sign-In error:", error);
+      setSignInError(error.message || "Google Sign-In failed.");
       throw error;
     } finally {
       setAuthLoading(false);

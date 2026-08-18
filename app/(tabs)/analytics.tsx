@@ -5,7 +5,9 @@ import { StatsGrid } from "@/components/analytics/StatsGrid";
 import { TimeFrameSelector } from "@/components/analytics/TimeFrameSelector";
 import { HistoryModal } from "@/components/home/HistoryModal";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useSleepEntries } from "@/hooks/useSleepEntries";
+// import { useSleepEntries } from "@/hooks/old.useSleepEntries";
+import { useSleepEntries } from "@/contexts/SleepEntriesContext";
+
 import {
   DayData,
   getAllMonthsData,
@@ -192,10 +194,13 @@ export default function AnalyticsScreen() {
           <Text style={[styles.chartTitle, { color: colors.foreground }]}>
             Sleep Times
           </Text>
-          <SleepLineChart
-            data={sleepTimeData}
-            width={needsScroll ? Math.max(chartWidth ?? 0, 300) : 300}
-          />
+          {needsScroll ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <SleepLineChart data={sleepTimeData} width={chartWidth} />
+            </ScrollView>
+          ) : (
+            <SleepLineChart data={sleepTimeData} />
+          )}
         </View>
 
         {/* Stats grid moved to bottom */}

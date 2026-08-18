@@ -20,7 +20,8 @@ import { SecondaryActions } from "@/components/home/SecondaryActions";
 import { TodaySleepCard } from "@/components/home/TodaySleepCard";
 import { WeeklyComparisonCard } from "@/components/home/WeeklyComparisonCard";
 import { useAlert } from "@/contexts/AlertContext";
-import { useSleepEntries } from "@/hooks/useSleepEntries";
+// import { useSleepEntries } from "@/hooks/old.useSleepEntries";
+import { useSleepEntries } from "@/contexts/SleepEntriesContext";
 import { useWeeklyStats } from "@/hooks/useWeeklyStats";
 import {
   formatDuration,
@@ -298,7 +299,6 @@ export default function HomeScreen() {
         visible={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
         entries={entries}
-       
       />
 
       <FirstTimeSetup

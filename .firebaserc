@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "sleeptracker-d9fef"
-  }
+    "default": "sleeptracker-d9fef",
+    "def": "sleeptracker-d9fef"
+  },
+  "targets": {},
+  "etags": {}
 }

@@ -1,29 +1,30 @@
-# Sleep Tracker App V1
+# Sleep Tracker V1
 
-A simple and focused mobile sleep tracker built with **React Native + Expo**.
+A minimalist sleep logging app built with Expo + React Native + TypeScript.
 
-### Core Idea
-- Tap **Record Sleep** when you go to bed
-- Tap **Record Wakeup** when you wake up
-- The app automatically calculates your sleep duration
-- Shows a clear weekly comparison (This week vs Last week)
+## Features
 
-No complicated forms. No mood tracking. No AI. Just fast and effortless sleep logging.
+- One-tap sleep recording with hold-to-wake
+- Local storage (AsyncStorage) with offline-first design
+- Optional Google Sign-In with Firestore cloud backup
+- Analytics: bar chart, line chart, stats
+- CSV import/export
+- Notifications: bedtime, wake-up, daily quote
+- Dark/light theme, 12h/24h time format
 
-### Main Features (V1)
-- One-button sleep recording
-- Live timer while sleeping
-- Hold 5 seconds to cancel a session
-- Weekly average comparison
-- Manually add past sleep entries
-- Basic sleep history
-- Local storage only (AsyncStorage)
+## Tech Stack
 
-### Tech Stack
-- React Native + Expo
+- React Native + Expo SDK 57
 - Expo Router
 - TypeScript
 - AsyncStorage
+- Firebase Auth + Firestore
+- react-native-svg
+- expo-notifications, expo-haptics
 
-### Project Goal
-Build a clean, minimal, and reliable sleep tracking experience that users can use every day with almost zero friction.
+## Getting Started
+
+```bash
+npm install
+npx expo start
+```

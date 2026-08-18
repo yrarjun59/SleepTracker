@@ -4,6 +4,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { SleepEntry } from "@/types/sleep";
 import { getMonthlySummary } from "@/utils/analyticsHelpers";
 import { useFormattedTime } from "@/utils/formatTime";
+import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 
 import {
@@ -15,19 +16,20 @@ import {
   View,
 } from "react-native";
 
-type Tab = "7d" | "15d" | "30d" | "6m";
+type Tab = "7d" | "30d" | "6m" | "all";
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   entries: SleepEntry[];
+  onDelete: (id: string) => Promise<void>;
 }
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: "7d", label: "7 Days" },
-  { key: "15d", label: "15 Days" },
-  { key: "30d", label: "30 Days" },
-  { key: "6m", label: "6 Months" },
+  { key: "7d", label: "Last 7 days" },
+  { key: "30d", label: "Last 30 days" },
+  { key: "6m", label: "Last 6 months" },
+  { key: "all", label: "All time" },
 ];
 
 function getQualityVerdict(duration: number | null): string {
@@ -45,7 +47,7 @@ const daysAgo = (n: number) => {
   return d;
 };
 
-export function HistoryModal({ visible, onClose, entries }: Props) {
+export function HistoryModal({ visible, onClose, entries, onDelete }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("7d");
   const { colors } = useTheme();
   const formatTime = useFormattedTime();
@@ -61,18 +63,20 @@ export function HistoryModal({ visible, onClose, entries }: Props) {
         end = now;
         start = daysAgo(7);
         break;
-      case "15d":
-        end = daysAgo(7);
-        start = daysAgo(15);
-        break;
       case "30d":
-        end = daysAgo(15);
+        end = now;
         start = daysAgo(30);
         break;
       case "6m":
         return {
           individualEntries: [],
           monthlySummary: getMonthlySummary(entries, 6),
+        };
+      case "all":
+        // Show all months (capped at 24 for performance)
+        return {
+          individualEntries: [],
+          monthlySummary: getMonthlySummary(entries, 24),
         };
       default:
         return { individualEntries: [], monthlySummary: null };
@@ -108,6 +112,35 @@ export function HistoryModal({ visible, onClose, entries }: Props) {
       : "—";
 
     return `${sleepStr}  –  ${wakeStr}`;
+  };
+
+  const handleDelete = (entry: SleepEntry) => {
+    const entryDate = new Date(entry.sleepTime).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    showAlert({
+      type: "confirm",
+      title: "Delete Sleep Entry",
+      message: `Are you sure you want to delete the sleep entry for ${entryDate}?`,
+      actions: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            await onDelete(entry.id);
+            showAlert({
+              type: "success",
+              title: "Deleted",
+              message: "Sleep entry deleted.",
+              autoDismiss: true,
+            });
+          },
+        },
+      ],
+    });
   };
 
   return (
@@ -151,7 +184,7 @@ export function HistoryModal({ visible, onClose, entries }: Props) {
             ))}
           </View>
 
-          {activeTab === "6m" ? (
+          {activeTab === "6m" || activeTab === "all" ? (
             monthlySummary && monthlySummary.length > 0 ? (
               <FlatList
                 data={monthlySummary}
@@ -191,7 +224,7 @@ export function HistoryModal({ visible, onClose, entries }: Props) {
               />
             ) : (
               <Text style={[styles.empty, { color: colors.mutedForeground }]}>
-                No sleep data in the last 6 months.
+                No sleep data in this period.
               </Text>
             )
           ) : individualEntries.length === 0 ? (
@@ -216,6 +249,17 @@ export function HistoryModal({ visible, onClose, entries }: Props) {
                       >
                         {formatEntry(item)}
                       </Text>
+                      <TouchableOpacity
+                        onPress={() => handleDelete(item)}
+                        hitSlop={8}
+                        style={styles.iconBtn}
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={14}
+                          color={colors.destructive}
+                        />
+                      </TouchableOpacity>
                     </View>
                     <Text
                       style={[
@@ -312,6 +356,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "500",
     flex: 1,
+  },
+  iconBtn: {
+    marginLeft: 6,
+    padding: 2,
   },
   duration: {
     fontSize: 13,

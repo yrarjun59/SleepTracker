@@ -16,7 +16,7 @@ export function formatDuration(hours: number | null): string {
 }
 
 export function getTodayDateString(): string {
-  return new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+  return getLocalDateString(); // YYYY-MM-DD
 }
 
 export function getDateLabel(date = new Date()): string {
@@ -25,6 +25,10 @@ export function getDateLabel(date = new Date()): string {
     month: "short",
     day: "numeric",
   });
+}
+
+export function getLocalDateString(date = new Date()): string {
+  return toLocalISOString(date).split("T")[0];
 }
 
 export function getWeekRange(offset = 0): { start: Date; end: Date } {

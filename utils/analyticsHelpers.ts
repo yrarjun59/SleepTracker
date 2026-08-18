@@ -368,11 +368,10 @@ export interface MonthlyStats {
   bestMonth: { date: string; hours: number };
   worstMonth: { date: string; hours: number };
   monthsTracked: number;
+  targetPercent: number; // average % of 7h/day target
 }
 
 export function getMonthlyStats(data: DayData[]): MonthlyStats {
-  // In monthly data, totalHours holds the total sleep for the month.
-  // We convert each month's total to an average per night.
   const monthsWithSleep = data.filter((d) => d.totalHours > 0);
   if (monthsWithSleep.length === 0) {
     return {
@@ -380,16 +379,22 @@ export function getMonthlyStats(data: DayData[]): MonthlyStats {
       bestMonth: { date: "", hours: 0 },
       worstMonth: { date: "", hours: 0 },
       monthsTracked: 0,
+      targetPercent: 0,
     };
   }
 
+  const TARGET_HOURS_PER_DAY = 7;
   let sumOfAverages = 0;
+  let totalPercent = 0;
   let best = { date: "", hours: 0 };
   let worst = { date: "", hours: Infinity };
 
   for (const month of monthsWithSleep) {
     const avg = month.totalHours / month.daysInPeriod;
     sumOfAverages += avg;
+    const idealTotal = month.daysInPeriod * TARGET_HOURS_PER_DAY;
+    const percent = (month.totalHours / idealTotal) * 100;
+    totalPercent += percent;
     if (avg > best.hours)
       best = { date: month.date, hours: Math.round(avg * 10) / 10 };
     if (avg < worst.hours)
@@ -398,11 +403,13 @@ export function getMonthlyStats(data: DayData[]): MonthlyStats {
 
   const avgOfAverages =
     Math.round((sumOfAverages / monthsWithSleep.length) * 10) / 10;
+  const avgTargetPercent = Math.round(totalPercent / monthsWithSleep.length);
   return {
     avgHours: avgOfAverages,
     bestMonth: best,
     worstMonth: worst,
     monthsTracked: monthsWithSleep.length,
+    targetPercent: avgTargetPercent,
   };
 }
 

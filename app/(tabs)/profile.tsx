@@ -6,7 +6,8 @@ import { useAlert } from "@/contexts/AlertContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useSleepEntries } from "@/hooks/useSleepEntries";
+// import { useSleepEntries } from "@/hooks/old.useSleepEntries";
+import { useSleepEntries } from "@/contexts/SleepEntriesContext";
 import { deleteAllUserEntries, pushEntry } from "@/services/cloudStorage";
 import * as sleepStorage from "@/services/sleepStorage";
 import { SleepEntry } from "@/types/sleep";
@@ -18,6 +19,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useEffect, useState } from "react";
+
 import {
   ActivityIndicator,
   Image,
@@ -39,7 +41,6 @@ export default function ProfileScreen() {
     useAuth();
   const { timeFormat, setTimeFormat } = useSettings();
   const { colors } = useTheme();
-  const { refresh } = useSleepEntries();
 
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState("");
@@ -48,16 +49,29 @@ export default function ProfileScreen() {
   const [showNotifSettings, setShowNotifSettings] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
+  const { refresh, syncError, lastSyncedAt } = useSleepEntries();
+
   useEffect(() => {
     if (signInError) {
       showAlert({
         type: "error",
         title: "Google Sign-In Failed",
         message: signInError,
-        autoDismiss: false, // keep until user closes
+        autoDismiss: false,
       });
     }
   }, [signInError]);
+
+  useEffect(() => {
+    if (syncError) {
+      showAlert({
+        type: "warning",
+        title: "Sync Issue",
+        message: syncError,
+        autoDismiss: false,
+      });
+    }
+  }, [syncError]);
 
   // ---------- Import ----------
   const handleImport = async () => {
@@ -374,6 +388,14 @@ export default function ProfileScreen() {
                   Your sleep data is backed up to the cloud.
                 </Text>
               </View>
+
+              {user && lastSyncedAt && (
+                <Text
+                  style={[styles.syncStatus, { color: colors.textSecondary }]}
+                >
+                  Last synced {lastSyncedAt.toLocaleTimeString()}
+                </Text>
+              )}
             </>
           ) : (
             <View style={{ alignItems: "center" }}>
@@ -663,5 +685,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: "center",
     opacity: 0.6,
+  },
+  syncStatus: {
+    fontSize: 12,
+    marginTop: 4,
   },
 });
