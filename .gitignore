@@ -48,4 +48,5 @@ yarn-error.*
 eas.json
 app.json
 
+/__tests__
 /google-services.json/
